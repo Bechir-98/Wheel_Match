@@ -1,5 +1,6 @@
 """Vendor-facing dashboard (authenticated vendor only)."""
 
+import json
 from decimal import Decimal
 from typing import Any
 
@@ -7,9 +8,22 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_vendor
-from app.models import Comercant, Fauteuil, TypeFauteuil, Utilisateur
+from app.models import Comercant, DemandeFauteuil, Fauteuil, Patient, TypeFauteuil, UserPreferences, Utilisateur
+from app.services.messaging import unread_count
 
 router = APIRouter()
+
+
+def _pref_threshold(db: Session, uid: int) -> int:
+    """ponytail: single vendor-level threshold, per-product when needed."""
+    row = db.query(UserPreferences).filter(UserPreferences.ID_UTILISATUER == uid).first()
+    if row and row.PREFS_JSON:
+        try:
+            v = int(json.loads(row.PREFS_JSON).get("LOW_STOCK", 5))
+            return max(0, v)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            pass
+    return 5
 
 
 @router.get("/dashboard")
@@ -28,7 +42,7 @@ def vendor_dashboard(
     )
 
     products_count = len(rows)
-    low_stock_threshold = 5
+    low_stock_threshold = _pref_threshold(db, uid)
     low_stock_count = sum(1 for f, _ in rows if f.QT_STOCK is not None and int(f.QT_STOCK) <= low_stock_threshold)
     total_units = int(sum(int(f.QT_STOCK or 0) for f, _ in rows))
 
@@ -64,10 +78,45 @@ def vendor_dashboard(
             "low_stock_threshold": low_stock_threshold,
             "inventory_value": float(inventory_value),
             "average_list_price": avg_price,
-            "pending_orders": 0,
+            "pending_orders": db.query(DemandeFauteuil).join(
+                Fauteuil, DemandeFauteuil.ID_FAUTEUIL == Fauteuil.ID_FAUTEUIL
+            ).filter(
+                Fauteuil.ID_UTILISATUER == uid,
+                DemandeFauteuil.STATUT == "EN_ATTENTE",
+            ).count(),
             "monthly_revenue": None,
             "average_rating": None,
-            "messages_unread": 0,
+            "messages_unread": unread_count(db, user.ID_UTILISATUER),
         },
         "recent_products": recent_products,
     }
+
+
+@router.get("/requests")
+def vendor_requests(
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_vendor),
+):
+    """Read-only demandes on this vendor's wheelchairs."""
+    rows = (
+        db.query(DemandeFauteuil, Fauteuil, TypeFauteuil.NOM_TYPE, Patient)
+        .join(Fauteuil, DemandeFauteuil.ID_FAUTEUIL == Fauteuil.ID_FAUTEUIL)
+        .join(TypeFauteuil, Fauteuil.ID_TYPE == TypeFauteuil.ID_TYPE)
+        .join(Patient, DemandeFauteuil.ID_PATIENT == Patient.ID_UTILISATUER)
+        .filter(Fauteuil.ID_UTILISATUER == user.ID_UTILISATUER)
+        .order_by(DemandeFauteuil.DATE_DEMANDE.desc())
+        .all()
+    )
+    out = []
+    for d, f, nom_type, p in rows:
+        parts = [str(p.PRENOMP or "").strip(), str(p.NOMP or "").strip()]
+        out.append({
+            "ID_DEMANDE": d.ID_DEMANDE,
+            "ID_FAUTEUIL": d.ID_FAUTEUIL,
+            "NOM_TYPE": nom_type,
+            "STATUT": d.STATUT,
+            "ORIGIN": d.ORIGIN or "patient",
+            "DATE_DEMANDE": d.DATE_DEMANDE.isoformat() if d.DATE_DEMANDE else None,
+            "patient_name": " ".join(x for x in parts if x) or "Patient",
+        })
+    return out

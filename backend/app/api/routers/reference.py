@@ -3,7 +3,7 @@ from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Composant, Morphologie, Option, Pathologie
+from app.models import Composant, Morphologie, Option, Pathologie, TypeFauteuil
 
 router = APIRouter()
 
@@ -35,4 +35,10 @@ def components(db: Session = Depends(get_db)):
 @router.get("/options")
 def options(db: Session = Depends(get_db)):
     rows = db.query(Option).all()
+    return _serialize_rows(rows)
+
+
+@router.get("/types")
+def wheelchair_types(db: Session = Depends(get_db)):
+    rows = db.query(TypeFauteuil).all()
     return _serialize_rows(rows)
