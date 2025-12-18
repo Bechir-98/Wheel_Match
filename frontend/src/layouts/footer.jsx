@@ -1,37 +1,20 @@
-import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 function Footer() {
-    return (
-        <div>
-            <footer
-                id="about"
-                style={{
-                    backgroundColor: "#212529",
-                    color: "#fff",
-                    padding: "40px 20px",
-                    textAlign: "center",
-                    marginTop: "40px",
-                    fontSize: "16px"
-                }}
-                className="about"
-            >
-                <div style={{ maxWidth: "1000px", margin: "0 auto" }}>
-                    <h2>About Us</h2>
-                    <p style={{ maxWidth: "600px", margin: "10px auto" }}>
-                        We are dedicated to helping individuals find the perfect mobility solution that fits their condition, lifestyle, and personal preferences. Our platform connects patients, clinicians, and vendors to simplify the wheelchair selection process.
-                    </p>
-
-                    <div style={{ marginTop: "30px" }}>
-                        <p>
-                            Contact us: <a href="mailto:support@wheelmatch.com" style={{ color: "#fff", textDecoration: "none" }}>support@wheelmatch.com</a> | 
-                            <a href="tel:+21692195666" style={{ color: "#fff", textDecoration: "none" }}> +216 92195666</a>
-                        </p>
-                        <p>&copy; {new Date().getFullYear()} WheelMatch. All rights reserved.</p>
-                    </div>
-                </div>
-            </footer>
-        </div>
-    );
+  const { t } = useTranslation();
+  return (
+    <footer id="about" className="mt-10 bg-secondary px-5 py-10 text-center text-sm text-secondary-foreground">
+      <div className="mx-auto max-w-4xl">
+        <h2 className="text-xl font-semibold">{t('about.title')}</h2>
+        <p className="mx-auto mt-2 max-w-xl text-muted-foreground">{t('about.tagline')}</p>
+        <p className="mt-6">
+          {t('about.contact')}: <a href="mailto:support@wheelmatch.com" className="hover:underline">support@wheelmatch.com</a> |{' '}
+          <a href="tel:+21692195666" className="hover:underline">+216 92195666</a>
+        </p>
+        <p className="mt-2 text-muted-foreground">&copy; {new Date().getFullYear()} WheelMatch. {t('about.rights')}</p>
+      </div>
+    </footer>
+  );
 }
 
 export default Footer;

@@ -1,15 +1,18 @@
-import './styles/App.css';
-import 'bootstrap/dist/css/bootstrap.min.css';
+import { ThemeProvider } from 'next-themes';
 import AppRoutes from './routes/AppRoutes';
-
-import Footer from './layouts/footer.jsx';
+import { ChatProvider } from './components/chat/ChatContext.jsx';
+import ChatWidget from './components/chat/ChatWidget.jsx';
 
 function App() {
   return (
-    <>
-      <AppRoutes />
-      {/* <Footer /> */}
-    </>
+    <ThemeProvider attribute="class" defaultTheme="light">
+      <ChatProvider>
+        <>
+          <AppRoutes />
+          <ChatWidget />
+        </>
+      </ChatProvider>
+    </ThemeProvider>
   );
 }
 

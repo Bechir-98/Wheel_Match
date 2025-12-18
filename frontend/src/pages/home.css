@@ -11,8 +11,13 @@
   --home-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
   font-size: clamp(0.95rem, 2vw, 1.0625rem);
   line-height: 1.6;
-  color: var(--home-text);
+  /* ponytail: base follows theme (shadcn buttons inherit it); dark surfaces set their own light text */
+  color: #1a1d26;
   overflow-x: hidden;
+}
+
+.dark .home-page {
+  color: var(--home-text);
 }
 
 .home-page section {
@@ -189,6 +194,32 @@
 .home-section {
   padding: clamp(2.5rem, 6vw, 4rem) 0;
   color: #1a1d26;
+}
+
+.dark .home-section {
+  color: var(--home-text);
+}
+
+.dark .home-section--muted {
+  background: linear-gradient(180deg, #151c28 0%, #10151f 100%);
+}
+
+.dark .home-section__title,
+.dark .home-step h3,
+.dark .home-flip-face--front h2 {
+  color: #f1f5f9;
+}
+
+.dark .home-section__desc,
+.dark .home-step p,
+.dark .home-flip-hint {
+  color: #9aa5b8;
+}
+
+.dark .home-step,
+.dark .home-flip-face--front {
+  background: linear-gradient(180deg, #1a2332 0%, #141b28 100%);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .home-section--muted {

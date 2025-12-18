@@ -1,52 +1,18 @@
 import React, { useState } from 'react';
-import styled from 'styled-components';
+import { useTranslation } from 'react-i18next';
 import { motion } from 'framer-motion';
-import { FaUser, FaLock } from 'react-icons/fa';
+import { User, Lock, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import theme from '../styles/theme';
-import Button from '../components/common/Button';
-import Input from '../components/common/Input';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card.jsx';
+import { Button } from '../components/ui/button.jsx';
+import { Input } from '../components/ui/input.jsx';
+import { Label } from '../components/ui/label.jsx';
+import { Alert } from '../components/ui/alert.jsx';
 import { apiUrl } from '../config/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
 
-const PageContainer = styled.div`
-  min-height: calc(100vh - 76px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: ${theme.colors.neutral[100]};
-  padding: ${theme.spacing[8]} ${theme.spacing[4]};
-`;
-
-const FormContainer = styled(motion.div)`
-  max-width: 400px;
-  width: 100%;
-  padding: ${theme.spacing[8]};
-  background-color: ${theme.colors.white};
-  border-radius: ${theme.borderRadius.lg};
-  box-shadow: ${theme.shadows.lg};
-`;
-
-const Title = styled.h2`
-  text-align: center;
-  margin-bottom: ${theme.spacing[6]};
-  color: ${theme.colors.neutral[900]};
-`;
-
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: ${theme.spacing[4]};
-`;
-
-const ErrorMessage = styled.div`
-  color: ${theme.colors.error[500]};
-  font-size: ${theme.typography.fontSize.sm};
-  margin-top: ${theme.spacing[2]};
-  text-align: center;
-`;
-
 const SignInPage = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const { refreshSession } = useAuth();
   const [formData, setFormData] = useState({
@@ -55,7 +21,7 @@ const SignInPage = () => {
   });
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const handleChange = (e) => {
     const { id, value } = e.target;
     setFormData({
@@ -68,15 +34,15 @@ const SignInPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Basic validation
     if (!formData.email || !formData.password) {
-      setError('Please enter both email and password');
+      setError(t('auth.fillEmailPassword'));
       return;
     }
-    
+
     setIsLoading(true);
-    
+
     try {
       const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
@@ -95,7 +61,7 @@ const SignInPage = () => {
       try {
         data = JSON.parse(raw);
       } catch {
-        setError(`Server error (${response.status}). Is the API running?`);
+        setError(t('auth.serverErrorApi', { status: response.status }));
         return;
       }
 
@@ -106,7 +72,7 @@ const SignInPage = () => {
             ? detail
             : Array.isArray(detail)
               ? detail.map((d) => d.msg || JSON.stringify(d)).join(', ')
-              : 'Login failed. Please try again.',
+              : t('auth.loginFailed'),
         );
         return;
       }
@@ -120,59 +86,72 @@ const SignInPage = () => {
         refreshSession();
         navigate(data.redirect || '/patient-dashboard');
       } else {
-        setError(data.error || data.message || 'Login failed. Please try again.');
+        setError(data.error || data.message || t('auth.loginFailed'));
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Connection error. Please try again later.');
+      setError(t('auth.connectionError'));
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <PageContainer>
-      <FormContainer
+    <div className="flex min-h-[calc(100vh-76px)] items-center justify-center bg-background px-4 py-8">
+      <motion.div
+        className="w-full max-w-md"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <Title>Welcome Back</Title>
-        <Form onSubmit={handleSubmit}>
-          <Input
-            id="email"
-            type="email"
-            label="Email"
-            placeholder="Enter your email"
-            icon={<FaUser />}
-            required
-            value={formData.email}
-            onChange={handleChange}
-          />
-          <Input
-            id="password"
-            type="password"
-            label="Password"
-            placeholder="Enter your password"
-            icon={<FaLock />}
-            required
-            value={formData.password}
-            onChange={handleChange}
-          />
-          
-          {error && <ErrorMessage>{error}</ErrorMessage>}
-          
-          <Button 
-            type="submit" 
-            variant="primary" 
-            fullWidth
-            disabled={isLoading}
-          >
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </Button>
-        </Form>
-      </FormContainer>
-    </PageContainer>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">{t('auth.welcomeBack')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div className="grid gap-1.5">
+                <Label htmlFor="email">{t('auth.email')}</Label>
+                <div className="relative">
+                  <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder={t('auth.emailPlaceholder')}
+                    required
+                    value={formData.email}
+                    onChange={handleChange}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="password">{t('auth.password')}</Label>
+                <div className="relative">
+                  <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder={t('auth.signInPasswordPlaceholder')}
+                    required
+                    value={formData.password}
+                    onChange={handleChange}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+
+              {error && <Alert variant="destructive">{error}</Alert>}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {isLoading ? t('auth.signingIn') : t('auth.signIn')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </div>
   );
 };
 

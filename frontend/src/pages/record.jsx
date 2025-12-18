@@ -1,7 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Card, Spinner, Alert, Button, ListGroup, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { Calendar3, FileEarmarkMedical, PersonBadge } from 'react-bootstrap-icons';
+import { Calendar, FileText, Loader2, User } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import DashboardShell from '../components/dashboard/DashboardShell.jsx';
 import { apiUrl, authHeaders } from '../config/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -17,6 +21,7 @@ function formatDate(iso) {
 }
 
 export default function Record() {
+  const { t } = useTranslation();
   const { user, isAuthenticated } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -34,17 +39,17 @@ export default function Record() {
             ? json.detail
             : Array.isArray(json.detail)
               ? json.detail.map((d) => d.msg).join(', ')
-              : 'Unable to load medical record';
+              : t('record.errLoad');
         throw new Error(msg);
       }
       setData(json);
     } catch (e) {
-      setError(e.message || 'Failed to load');
+      setError(e.message || t('record.errFailed'));
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!isAuthenticated || !user?.userType) return;
@@ -52,14 +57,14 @@ export default function Record() {
       load();
     } else {
       setLoading(false);
-      setError('This page is for patient accounts.');
+      setError(t('record.onlyPatients'));
     }
-  }, [load, user?.userType, isAuthenticated]);
+  }, [load, user?.userType, isAuthenticated, t]);
 
   if (!isAuthenticated || !user?.userType) {
     return (
-      <div className="d-flex justify-content-center py-5">
-        <Spinner animation="border" role="status" />
+      <div className="flex justify-center py-5">
+        <Loader2 className="h-6 w-6 animate-spin" role="status" aria-label={t('record.loadingAria')} />
       </div>
     );
   }
@@ -67,9 +72,9 @@ export default function Record() {
   if (user.userType !== 'patient') {
     return (
       <div className="p-4" style={{ maxWidth: 560, margin: '0 auto' }}>
-        <Alert variant="info">
-          Medical record view is only available to patients.{' '}
-          <Link to="/">Return home</Link>
+        <Alert>
+          {t('record.onlyPatientsView')}{' '}
+          <Link to="/">{t('record.returnHome')}</Link>
         </Alert>
       </div>
     );
@@ -77,24 +82,24 @@ export default function Record() {
 
   const inner = (
     <div className="py-4 px-2" style={{ maxWidth: 720, margin: '0 auto' }}>
-      <h1 className="h3 mb-4 d-flex align-items-center gap-2">
-        <FileEarmarkMedical className="text-primary" />
-        Medical record
+      <h1 className="text-2xl font-bold mb-4 flex items-center gap-2">
+        <FileText className="text-primary h-6 w-6" />
+        {t('record.title')}
       </h1>
 
       {loading && (
-        <div className="d-flex align-items-center gap-2 py-5">
-          <Spinner animation="border" size="sm" />
-          Loading…
+        <div className="flex items-center gap-2 py-5">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          {t('record.loading')}
         </div>
       )}
 
       {!loading && error && (
-        <Alert variant="danger">
+        <Alert variant="destructive">
           {error}
           <div className="mt-2">
-            <Button size="sm" variant="outline-danger" onClick={() => load()}>
-              Retry
+            <Button size="sm" variant="outline" className="text-destructive" onClick={() => load()}>
+              {t('record.retry')}
             </Button>
           </div>
         </Alert>
@@ -103,72 +108,72 @@ export default function Record() {
       {!loading && !error && data && (
         <>
           <Card className="mb-4 shadow-sm">
-            <Card.Header className="fw-semibold">Clinical summary</Card.Header>
-            <Card.Body>
+            <CardHeader className="font-semibold py-4"><CardTitle className="text-base">{t('record.summaryTitle')}</CardTitle></CardHeader>
+            <CardContent>
               {data.medical ? (
-                <ListGroup variant="flush">
-                  <ListGroup.Item className="px-0">
-                    <strong>Morphology</strong>
-                    <div className="text-muted">{data.medical.MORPHOLOGIE || '—'}</div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0">
-                    <strong>Pathology context</strong>
-                    <div className="text-muted">{data.medical.PATHOLOGIE || '—'}</div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0">
-                    <strong>Notes</strong>
-                    <div className="text-muted" style={{ whiteSpace: 'pre-wrap' }}>
+                <ul className="divide-y">
+                  <li className="px-0 py-3">
+                    <strong>{t('record.morphology')}</strong>
+                    <div className="text-muted-foreground">{data.medical.MORPHOLOGIE || '—'}</div>
+                  </li>
+                  <li className="px-0 py-3">
+                    <strong>{t('record.pathology')}</strong>
+                    <div className="text-muted-foreground">{data.medical.PATHOLOGIE || '—'}</div>
+                  </li>
+                  <li className="px-0 py-3">
+                    <strong>{t('record.notes')}</strong>
+                    <div className="text-muted-foreground" style={{ whiteSpace: 'pre-wrap' }}>
                       {data.medical.NOTES || '—'}
                     </div>
-                  </ListGroup.Item>
-                  <ListGroup.Item className="px-0 small text-muted">
-                    Last updated: {formatDate(data.medical.UPDATED_AT)}
-                  </ListGroup.Item>
-                </ListGroup>
+                  </li>
+                  <li className="px-0 py-3 text-sm text-muted-foreground">
+                    {t('record.lastUpdated', { date: formatDate(data.medical.UPDATED_AT) })}
+                  </li>
+                </ul>
               ) : (
-                <p className="text-muted mb-0">No clinical summary has been filed yet.</p>
+                <p className="text-muted-foreground mb-0">{t('record.summaryEmpty')}</p>
               )}
-            </Card.Body>
+            </CardContent>
           </Card>
 
           <Card className="shadow-sm">
-            <Card.Header className="fw-semibold d-flex justify-content-between align-items-center">
-              <span>Consultation history</span>
-              <Badge bg="secondary">{(data.consultations || []).length}</Badge>
-            </Card.Header>
-            <Card.Body className="p-0">
+            <CardHeader className="font-semibold flex flex-row justify-between items-center py-4">
+              <CardTitle className="text-base">{t('record.historyTitle')}</CardTitle>
+              <Badge variant="secondary">{(data.consultations || []).length}</Badge>
+            </CardHeader>
+            <CardContent className="p-0">
               {(data.consultations || []).length === 0 ? (
-                <p className="text-muted p-3 mb-0">No consultations recorded.</p>
+                <p className="text-muted-foreground p-3 mb-0">{t('record.historyEmpty')}</p>
               ) : (
-                <ListGroup variant="flush">
+                <ul className="divide-y">
                   {data.consultations.map((c) => (
-                    <ListGroup.Item key={c.num_consultation} className="py-3">
-                      <div className="d-flex align-items-start gap-2">
-                        <PersonBadge className="text-primary flex-shrink-0 mt-1" />
+                    <li key={c.num_consultation} className="py-3 px-6">
+                      <div className="flex items-start gap-2">
+                        <User className="text-primary shrink-0 mt-1 h-4 w-4" />
                         <div>
-                          <div className="fw-semibold">{c.pathology_name}</div>
-                          <div className="small text-muted d-flex align-items-center gap-1 mt-1">
-                            <Calendar3 />
+                          <div className="font-semibold">{c.pathology_name}</div>
+                          <div className="small text-muted-foreground flex items-center gap-1 mt-1 text-sm">
+                            <Calendar className="h-3.5 w-3.5" />
                             {formatDate(c.date_consultation)}
-                            {c.is_upcoming ? <Badge bg="primary ms-2">Upcoming</Badge> : null}
+                            {c.is_upcoming ? <Badge className="ml-2">{t('record.badgeUpcoming')}</Badge> : null}
                           </div>
-                          <div className="small mt-1">Clinician: {c.clinician_name}</div>
-                          <div className="small text-muted">Morphology recorded: {c.morphology}</div>
+                          <div className="small mt-1 text-sm">{t('record.clinician', { v: c.clinician_name })}</div>
+                          <div className="small text-muted-foreground text-sm">{t('record.morphRecorded', { v: c.morphology })}</div>
                         </div>
                       </div>
-                    </ListGroup.Item>
+                    </li>
                   ))}
-                </ListGroup>
+                </ul>
               )}
-            </Card.Body>
+            </CardContent>
           </Card>
 
-          <div className="mt-4 d-flex flex-wrap gap-2">
-            <Button variant="outline-primary" as={Link} to="/patient-dashboard">
-              Back to dashboard
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button variant="outline" asChild>
+              <Link to="/patient-dashboard">{t('record.backDash')}</Link>
             </Button>
-            <Button variant="primary" as={Link} to="/wheelchairs">
-              Browse wheelchairs
+            <Button asChild>
+              <Link to="/wheelchairs">{t('record.browse')}</Link>
             </Button>
           </div>
         </>

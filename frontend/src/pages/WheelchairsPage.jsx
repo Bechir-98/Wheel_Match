@@ -1,23 +1,18 @@
 import { useState, useEffect, useMemo } from "react";
-import { 
-  Container, 
-  Row, 
-  Col, 
-  Card, 
-  Button, 
-  Form, 
-  Badge, 
-  Alert,
-  Placeholder,
-  InputGroup,
-  OverlayTrigger,
-  Tooltip,
-  Offcanvas
-} from "react-bootstrap";
 import { useNavigate } from "react-router-dom";
-import PropTypes from 'prop-types';
+import { useTranslation } from 'react-i18next';
+import { Search, Filter, Accessibility, Package, Sparkles, Settings, TriangleAlert, Info, RotateCcw } from 'lucide-react';
+import { Button } from "../components/ui/button.jsx";
+import { Card, CardContent } from "../components/ui/card.jsx";
+import { Badge } from "../components/ui/badge.jsx";
+import { Alert } from "../components/ui/alert.jsx";
+import { Input } from "../components/ui/input.jsx";
+import { Label } from "../components/ui/label.jsx";
+import { Skeleton } from "../components/ui/skeleton.jsx";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../components/ui/dialog.jsx";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../components/ui/select.jsx";
+import { cn } from "@/lib/utils";
 
-// Import default images
 import standardWheelchair from '../assets/wheelchair-standard.jpg';
 import customWheelchair from '../assets/wheelchair-custom.jpg';
 import sportWheelchair from '../assets/wheelchair-sport.jpg';
@@ -25,724 +20,382 @@ import defaultWheelchair from '../assets/brand.png';
 import Twheel from '../assets/Twheel.jpg';
 import { apiUrl } from '../config/api.js';
 
-// Skeleton Loader Component
-const WheelchairSkeleton = () => (
-  <Col xs={12} sm={6} lg={4} className="mb-4">
-    <Card className="h-100 shadow border-0 rounded-3">
-      <div className="bg-light rounded-top" style={{ height: '200px' }} />
-      <Card.Body>
-        <Placeholder as={Card.Title} animation="glow">
-          <Placeholder xs={6} />
-        </Placeholder>
-        <Placeholder as={Card.Text} animation="glow">
-          <Placeholder xs={7} /> <Placeholder xs={4} />
-        </Placeholder>
-        <Placeholder.Button variant="primary" xs={12} className="mb-2" />
-        <Placeholder.Button variant="outline-primary" xs={12} />
-      </Card.Body>
-    </Card>
-  </Col>
-);
+const getWheelchairImage = (w) => {
+  if (w?.IMAGE) return w.IMAGE;
+  const imageMap = {
+    'leger': standardWheelchair,
+    'haut de gamme': customWheelchair,
+    'actif': sportWheelchair,
+    'traditionnel': Twheel,
+  };
+  return imageMap[w?.NOM_TYPE?.trim().toLowerCase()] || defaultWheelchair;
+};
+
+const emptyFilters = {
+  search: "",
+  type: "",
+  inStockOnly: true,
+  propulsion: "",
+  showNewOnly: false,
+  minPrice: "",
+  maxPrice: "",
+  pathology: "",
+  component: "",
+  option: "",
+};
 
 const WheelchairsPage = () => {
-  const [filters, setFilters] = useState({
-    type: "",
-    inStockOnly: true,
-    search: "",
-    propulsion: "",
-    showNewOnly: false,
-    priceRange: [0, 5000],
-    morphology: "",
-    pathology: "",
-    component: "",
-    option: ""
-  });
-
+  const { t } = useTranslation();
+  const SORTS = {
+    latest: t('catalog.sorts.latest'),
+    priceAsc: t('catalog.sorts.priceAsc'),
+    priceDesc: t('catalog.sorts.priceDesc'),
+  };
+  const [filters, setFilters] = useState(emptyFilters);
+  const [sort, setSort] = useState("latest");
   const [wheelchairs, setWheelchairs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showFilters, setShowFilters] = useState(false);
-  const navigate = useNavigate();
-
-  // Add these new state variables after the existing ones
-  const [morphologies, setMorphologies] = useState([]);
   const [pathologies, setPathologies] = useState([]);
   const [components, setComponents] = useState([]);
   const [options, setOptions] = useState([]);
+  const navigate = useNavigate();
 
-  // Enhanced image handling with multiple fallbacks
-  const getWheelchairImage = (typeName) => {
-    if (!typeName) return defaultWheelchair;
-    
-    // Normalize the type name for comparison
-    const normalizedType = typeName.trim().toLowerCase();
-    
-    // Define image mappings (all lowercase for case-insensitive matching)
-    const imageMap = {
-      'leger': standardWheelchair,
-      'haut de gamme': customWheelchair,
-      'actif': sportWheelchair,
-      'traditionnel':Twheel,
-      // Add more mappings as needed
-      'pediatric': defaultWheelchair,
-      'luxe': defaultWheelchair
-    };
-    
-    // Return matching image or default
-    return imageMap[normalizedType] || defaultWheelchair;
-  };
-
-  // Fetch wheelchair data
   useEffect(() => {
-    const fetchData = async () => {
+    (async () => {
       try {
-        const response = await fetch(apiUrl('/wheelchairs'));
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        // Enhance data with additional fields
-        const enhancedData = data.map(w => ({
+        const res = await fetch(apiUrl('/wheelchairs'));
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const list = await res.json();
+
+        // ponytail: N+1 detail fan-out for pathology/component/option filters, server-side when catalog grows
+        const enriched = await Promise.all(
+          list.map(async (w) => {
+            try {
+              const r = await fetch(apiUrl(`/wheelchairs/${w.ID_FAUTEUIL}`));
+              if (!r.ok) return w;
+              const d = await r.json();
+              return {
+                ...w,
+                pathologyIds: (d.pathologies || []).map((p) => p.ID_PATHOLOGIE),
+                componentIds: (d.components || []).map((c) => c.ID_COMPOSANT),
+                optionIds: (d.options || []).map((o) => o.ID_OPTION),
+                hasOptions: (d.options || []).length > 0,
+              };
+            } catch {
+              return w;
+            }
+          })
+        );
+        setWheelchairs(enriched.map((w) => ({
           ...w,
           isNew: w.ID_FAUTEUIL > 103,
-          imageUrl: getWheelchairImage(w.NOM_TYPE),
-          hasOptions: w.options && w.options.length > 0
-        }));
-        
-        setWheelchairs(enhancedData);
-      } catch (error) {
-        let errorMessage = "Failed to load wheelchairs";
-        if (error.message.includes('Failed to fetch')) {
-          errorMessage = "Network error - please check your connection";
-        } else if (error.response?.status === 404) {
-          errorMessage = "Data not found";
+          imageUrl: getWheelchairImage(w),
+        })));
+
+        try {
+          const [pRes, cRes, oRes] = await Promise.all([
+            fetch(apiUrl('/reference/pathologies')),
+            fetch(apiUrl('/reference/components')),
+            fetch(apiUrl('/reference/options')),
+          ]);
+          if (pRes.ok) setPathologies(await pRes.json());
+          if (cRes.ok) setComponents(await cRes.json());
+          if (oRes.ok) setOptions(await oRes.json());
+        } catch {
+          /* selects stay empty */
         }
-        setError(errorMessage);
+      } catch (e) {
+        setError(e.message.includes('Failed to fetch') ? t('catalog.networkError') : t('catalog.loadError'));
       } finally {
         setLoading(false);
       }
-    };
+    })();
+  }, [t]);
 
-    fetchData();
-  }, []);
+  const set = (patch) => setFilters((p) => ({ ...p, ...patch }));
+  const reset = () => { setFilters(emptyFilters); setSort("latest"); };
 
-  // Add this useEffect to fetch additional filter data
-  useEffect(() => {
-    const fetchFilterData = async () => {
-      try {
-        const [morphRes, pathRes, compRes, optRes] = await Promise.all([
-          fetch(apiUrl('/reference/morphologies')),
-          fetch(apiUrl('/reference/pathologies')),
-          fetch(apiUrl('/reference/components')),
-          fetch(apiUrl('/reference/options')),
-        ]);
+  const filtered = useMemo(() => {
+    const min = parseFloat(filters.minPrice);
+    const max = parseFloat(filters.maxPrice);
+    const list = wheelchairs.filter((w) =>
+      (!filters.search || w.NOM_TYPE.toLowerCase().includes(filters.search.toLowerCase())) &&
+      (!filters.type || w.NOM_TYPE === filters.type) &&
+      (!filters.inStockOnly || w.QT_STOCK > 0) &&
+      (!filters.propulsion || w.PROPULTION.toString() === filters.propulsion) &&
+      (!filters.showNewOnly || w.isNew) &&
+      (Number.isNaN(min) || Number(w.PRIX) >= min) &&
+      (Number.isNaN(max) || Number(w.PRIX) <= max) &&
+      (!filters.pathology || (w.pathologyIds || []).includes(Number(filters.pathology))) &&
+      (!filters.component || (w.componentIds || []).includes(Number(filters.component))) &&
+      (!filters.option || (w.optionIds || []).includes(Number(filters.option)))
+    );
+    if (sort === 'priceAsc') list.sort((a, b) => a.PRIX - b.PRIX);
+    if (sort === 'priceDesc') list.sort((a, b) => b.PRIX - a.PRIX);
+    return list;
+  }, [wheelchairs, filters, sort]);
 
-        const [morphData, pathData, compData, optData] = await Promise.all([
-          morphRes.json(),
-          pathRes.json(),
-          compRes.json(),
-          optRes.json()
-        ]);
+  const uniqueTypes = useMemo(() => [...new Set(wheelchairs.map((w) => w.NOM_TYPE))], [wheelchairs]);
+  const activeCount = Object.values(filters).filter((v) => v !== "" && v !== false).length;
 
-        setMorphologies(morphData);
-        setPathologies(pathData);
-        setComponents(compData);
-        setOptions(optData);
-      } catch (error) {
-        console.error("Error fetching filter data:", error);
-      }
-    };
-
-    fetchFilterData();
-  }, []);
-
-  // Filter handlers
-  const handleFilterChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    setFilters(prev => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  };
-
-  const resetFilters = () => {
-    setFilters({
-      type: "",
-      inStockOnly: true,
-      search: "",
-      propulsion: "",
-      showNewOnly: false,
-      priceRange: [0, 5000],
-      morphology: "",
-      pathology: "",
-      component: "",
-      option: ""
-    });
-  };
-
-  // Memoized filtered results
-  const filteredWheelchairs = useMemo(() => {
-    return wheelchairs.filter(w => {
-      return (
-        (!filters.type || w.NOM_TYPE === filters.type) &&
-        (!filters.inStockOnly || w.QT_STOCK > 0) &&
-        (!filters.search || w.NOM_TYPE.toLowerCase().includes(filters.search.toLowerCase())) &&
-        (!filters.propulsion || w.PROPULTION.toString() === filters.propulsion) &&
-        (!filters.showNewOnly || w.isNew) &&
-        (!filters.morphology || w.morphologies?.includes(filters.morphology)) &&
-        (!filters.pathology || w.pathologies?.includes(filters.pathology)) &&
-        (!filters.component || w.components?.includes(filters.component)) &&
-        (!filters.option || w.options?.includes(filters.option))
-      );
-    });
-  }, [wheelchairs, filters]);
-
-  const uniqueTypes = [...new Set(wheelchairs.map(w => w.NOM_TYPE))];
-
-  // Loading state
-  if (loading) return (
-    <Container fluid className="py-5 bg-light">
-      <div className="text-center mb-5">
-        <h1 className="display-4 fw-bold text-primary">Wheelchair Catalog</h1>
-        <p className="lead">Loading our premium selection of mobility solutions...</p>
-        <div className="spinner-grow text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
+  const filterForm = (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <Label>{t('catalog.search')}</Label>
+        <div className="flex">
+          <span className="flex items-center rounded-l-md border border-r-0 px-3">
+            <Search className="h-4 w-4 text-muted-foreground" />
+          </span>
+          <Input
+            value={filters.search}
+            onChange={(e) => set({ search: e.target.value })}
+            placeholder={t('catalog.searchPlaceholder')}
+            className="rounded-l-none"
+            aria-label={t('catalog.searchAria')}
+          />
         </div>
       </div>
-      <Row>
-        <Col md={3} className="mb-4 d-none d-md-block">
-          <div className="p-4 bg-white rounded-3 shadow">
-            <Placeholder as="h4" animation="glow">
-              <Placeholder xs={6} />
-            </Placeholder>
-            <Placeholder as={Form} animation="glow">
-              {[...Array(4)].map((_, i) => (
-                <Placeholder key={i} as={Form.Group} className="mb-3">
-                  <Placeholder as={Form.Label} xs={4} />
-                  <Placeholder as={Form.Control} xs={12} />
-                </Placeholder>
-              ))}
-            </Placeholder>
-          </div>
-        </Col>
-        <Col md={9}>
-          <Row className="g-4">
-            {[...Array(6)].map((_, i) => <WheelchairSkeleton key={i} />)}
-          </Row>
-        </Col>
-      </Row>
-    </Container>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.type')}</Label>
+        <Select value={filters.type || 'all'} onValueChange={(v) => set({ type: v === 'all' ? '' : v })}>
+          <SelectTrigger><SelectValue placeholder={t('catalog.allTypes')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('catalog.allTypes')}</SelectItem>
+            {uniqueTypes.map((t2) => <SelectItem key={t2} value={t2}>{t2}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.pathology')}</Label>
+        <Select value={filters.pathology || 'all'} onValueChange={(v) => set({ pathology: v === 'all' ? '' : v })}>
+          <SelectTrigger><SelectValue placeholder={t('catalog.allPathologies')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('catalog.allPathologies')}</SelectItem>
+            {pathologies.map((p) => <SelectItem key={p.ID_PATHOLOGIE} value={String(p.ID_PATHOLOGIE)}>{p.NOM_PAT}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.component')}</Label>
+        <Select value={filters.component || 'all'} onValueChange={(v) => set({ component: v === 'all' ? '' : v })}>
+          <SelectTrigger><SelectValue placeholder={t('catalog.allComponents')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('catalog.allComponents')}</SelectItem>
+            {components.map((c) => <SelectItem key={c.ID_COMPOSANT} value={String(c.ID_COMPOSANT)}>{c.NOM_COMP}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.option')}</Label>
+        <Select value={filters.option || 'all'} onValueChange={(v) => set({ option: v === 'all' ? '' : v })}>
+          <SelectTrigger><SelectValue placeholder={t('catalog.allOptions')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('catalog.allOptions')}</SelectItem>
+            {options.map((o) => <SelectItem key={o.ID_OPTION} value={String(o.ID_OPTION)}>{o.NOM_OPTION}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.priceRange')}</Label>
+        <div className="flex items-center gap-2">
+          <Input type="number" min="0" value={filters.minPrice} onChange={(e) => set({ minPrice: e.target.value })} placeholder={t('catalog.min')} aria-label={t('catalog.min')} />
+          <span className="text-muted-foreground">-</span>
+          <Input type="number" min="0" value={filters.maxPrice} onChange={(e) => set({ maxPrice: e.target.value })} placeholder={t('catalog.max')} aria-label={t('catalog.max')} />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label>{t('catalog.propulsion')}</Label>
+        <Select value={filters.propulsion || 'all'} onValueChange={(v) => set({ propulsion: v === 'all' ? '' : v })}>
+          <SelectTrigger><SelectValue placeholder={t('catalog.all')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('catalog.all')}</SelectItem>
+            <SelectItem value="0">{t('catalog.manual')}</SelectItem>
+            <SelectItem value="1">{t('catalog.electric')}</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={filters.inStockOnly} onChange={(e) => set({ inStockOnly: e.target.checked })} className="h-4 w-4 accent-primary" />
+        {t('catalog.inStockOnly')}
+      </label>
+      <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
+        <input type="checkbox" checked={filters.showNewOnly} onChange={(e) => set({ showNewOnly: e.target.checked })} className="h-4 w-4 accent-primary" />
+        {t('catalog.newOnly')}
+      </label>
+
+      <Button variant="outline" onClick={reset} className="w-full">
+        <RotateCcw className="h-4 w-4" /> {activeCount > 0 ? t('catalog.resetFiltersCount', { count: activeCount }) : t('catalog.resetFilters')}
+      </Button>
+    </div>
   );
 
-  // Error state
-  if (error) return (
-    <Container className="py-5">
-      <Alert variant="danger" className="shadow-sm rounded-3 border-0">
-        <Alert.Heading>Error loading data</Alert.Heading>
-        <p>{error}</p>
-        <div className="d-flex gap-2">
-          <Button variant="primary" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
-          <Button variant="secondary" onClick={() => setError(null)}>
-            Dismiss
-          </Button>
+  if (loading) return (
+    <div className="mx-auto max-w-6xl bg-muted px-4 py-5">
+      <div className="mb-5 text-center">
+        <Skeleton className="mx-auto h-9 w-64" />
+        <Skeleton className="mx-auto mt-2 h-5 w-80" />
+      </div>
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="hidden md:block">
+          <div className="space-y-3 rounded-lg bg-card p-4 shadow">
+            <Skeleton className="h-6 w-1/2" />
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="space-y-2">
+                <Skeleton className="h-4 w-1/3" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            ))}
+          </div>
         </div>
+        <div className="md:col-span-3">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <Card key={i} className="overflow-hidden">
+                <Skeleton className="h-[200px] w-full rounded-none" />
+                <CardContent className="space-y-2 p-4">
+                  <Skeleton className="h-5 w-1/2" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-9 w-full" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="mx-auto max-w-6xl px-4 py-5">
+      <Alert variant="destructive">
+        <p className="font-semibold">{t('catalog.errorTitle')}</p>
+        <p>{error}</p>
+        <Button className="mt-2" onClick={() => window.location.reload()}>{t('catalog.retry')}</Button>
       </Alert>
-    </Container>
+    </div>
   );
 
   return (
-    <Container fluid className="py-5 bg-light">
-      {/* Header Section */}
-      <Container className="mb-5 text-center">
-        <h1 className="display-4 fw-bold text-primary mb-3">Wheelchair Catalog</h1>
-        <p className="lead mb-4">Browse our selection of high-quality mobility solutions</p>
-        
-        {/* Mobile Filter Toggle */}
-        <Button 
-          variant="primary" 
-          className="d-md-none mb-4 shadow"
-          onClick={() => setShowFilters(true)}
-        >
-          <i className="bi bi-funnel me-2"></i> Show Filters
+    <div className="mx-auto max-w-6xl bg-muted px-4 py-5">
+      <div className="mx-auto mb-5 max-w-2xl text-center">
+        <h1 className="mb-2 text-3xl font-bold text-primary">{t('catalog.title')}</h1>
+        <p className="mb-4 text-muted-foreground">{t('catalog.subtitle')}</p>
+        <Button className="mb-4 md:hidden" onClick={() => setShowFilters(true)}>
+          <Filter className="h-4 w-4" /> {activeCount > 0 ? t('catalog.showFiltersCount', { count: activeCount }) : t('catalog.showFilters')}
         </Button>
-        
-        {/* Summary Stats */}
-        <div className="d-flex justify-content-center gap-4 flex-wrap">
-          <Badge bg="light" text="dark" className="px-3 py-2 fs-6 shadow-sm">
-            <i className="bi bi-wheelchair me-2"></i>
-            {wheelchairs.length} Total Products
+        <div className="flex flex-wrap justify-center gap-2">
+          <Badge variant="secondary" className="px-3 py-2 shadow-sm">
+            <Accessibility className="mr-2 h-4 w-4" /> {t('catalog.totalProducts', { count: wheelchairs.length })}
           </Badge>
-          <Badge bg="light" text="dark" className="px-3 py-2 fs-6 shadow-sm">
-            <i className="bi bi-box-seam me-2"></i>
-            {wheelchairs.filter(w => w.QT_STOCK > 0).length} In Stock
+          <Badge variant="secondary" className="px-3 py-2 shadow-sm">
+            <Package className="mr-2 h-4 w-4" /> {t('catalog.inStockBadge', { count: wheelchairs.filter((w) => w.QT_STOCK > 0).length })}
           </Badge>
         </div>
-      </Container>
+      </div>
 
-      <Row>
-        {/* Filter Sidebar - Desktop */}
-        <Col md={3} className="mb-4 d-none d-md-block">
-          <div className="p-4 bg-white rounded-3 shadow sticky-top" style={{top: '20px'}}>
-            <h4 className="mb-4 text-primary border-bottom pb-2">
-              <i className="bi bi-funnel me-2"></i>
-              Filters
+      <div className="grid gap-4 md:grid-cols-4">
+        <div className="hidden md:block">
+          <div className="sticky top-20 rounded-lg bg-card p-4 shadow">
+            <h4 className="mb-4 border-b pb-2 text-primary">
+              <Filter className="mr-2 inline h-4 w-4" /> {t('catalog.filters')}
             </h4>
-            <Form>
-              <Form.Group className="mb-4">
-                <InputGroup className="shadow-sm">
-                  <InputGroup.Text className="bg-white border-end-0">
-                    <i className="bi bi-search"></i>
-                  </InputGroup.Text>
-                  <Form.Control
-                    type="text"
-                    name="search"
-                    value={filters.search}
-                    onChange={handleFilterChange}
-                    placeholder="Search by name"
-                    className="border-start-0"
-                    aria-label="Search wheelchairs by name"
-                  />
-                </InputGroup>
-              </Form.Group>
-
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Wheelchair Type</Form.Label>
-                <Form.Select
-                  name="type"
-                  value={filters.type}
-                  onChange={handleFilterChange}
-                  className="shadow-sm"
-                  aria-label="Filter by wheelchair type"
-                >
-                  <option value="">All Types</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Morphology</Form.Label>
-                <Form.Select
-                  name="morphology"
-                  value={filters.morphology}
-                  onChange={handleFilterChange}
-                  className="shadow-sm"
-                  aria-label="Filter by morphology"
-                >
-                  <option value="">All Morphologies</option>
-                  {morphologies.map(morph => (
-                    <option key={morph.ID_MORPH} value={morph.ID_MORPH}>
-                      {morph.NOM_MORPH}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Pathology</Form.Label>
-                <Form.Select
-                  name="pathology"
-                  value={filters.pathology}
-                  onChange={handleFilterChange}
-                  className="shadow-sm"
-                  aria-label="Filter by pathology"
-                >
-                  <option value="">All Pathologies</option>
-                  {pathologies.map(path => (
-                    <option key={path.ID_PATHOLOGIE} value={path.ID_PATHOLOGIE}>
-                      {path.NOM_PAT}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Component</Form.Label>
-                <Form.Select
-                  name="component"
-                  value={filters.component}
-                  onChange={handleFilterChange}
-                  className="shadow-sm"
-                  aria-label="Filter by component"
-                >
-                  <option value="">All Components</option>
-                  {components.map(comp => (
-                    <option key={comp.ID_COMPOSANT} value={comp.ID_COMPOSANT}>
-                      {comp.NOM_COMP}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Options</Form.Label>
-                <Form.Select
-                  name="option"
-                  value={filters.option}
-                  onChange={handleFilterChange}
-                  className="shadow-sm"
-                  aria-label="Filter by options"
-                >
-                  <option value="">All Options</option>
-                  {options.map(opt => (
-                    <option key={opt.ID_OPTION} value={opt.ID_OPTION}>
-                      {opt.NOM_OPTION}
-                    </option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <div className="mb-4">
-                <Form.Label className="fw-semibold">Price Range</Form.Label>
-                <div className="d-flex align-items-center gap-2">
-                  <Form.Control
-                    type="number"
-                    value={filters.priceRange[0]}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      priceRange: [parseInt(e.target.value), prev.priceRange[1]]
-                    }))}
-                    className="shadow-sm"
-                    placeholder="Min"
-                  />
-                  <span>-</span>
-                  <Form.Control
-                    type="number"
-                    value={filters.priceRange[1]}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      priceRange: [prev.priceRange[0], parseInt(e.target.value)]
-                    }))}
-                    className="shadow-sm"
-                    placeholder="Max"
-                  />
-                </div>
-              </div>
-
-              <div className="mb-4 d-flex flex-column gap-2">
-                <Form.Check
-                  type="switch"
-                  id="inStockOnly"
-                  label="In Stock Only"
-                  name="inStockOnly"
-                  checked={filters.inStockOnly}
-                  onChange={handleFilterChange}
-                  className="fw-semibold"
-                />
-
-                <Form.Check
-                  type="switch"
-                  id="showNewOnly"
-                  label="New Arrivals Only"
-                  name="showNewOnly"
-                  checked={filters.showNewOnly}
-                  onChange={handleFilterChange}
-                  className="fw-semibold"
-                />
-
-                <Form.Check
-                  type="switch"
-                  id="propulsion"
-                  label="With Propulsion"
-                  name="propulsion"
-                  checked={filters.propulsion === "true"}
-                  onChange={(e) => setFilters(prev => ({
-                    ...prev,
-                    propulsion: e.target.checked ? "true" : ""
-                  }))}
-                  className="fw-semibold"
-                />
-              </div>
-
-              <Button
-                variant="outline-primary"
-                onClick={resetFilters}
-                className="w-100 shadow-sm"
-                aria-label="Reset all filters"
-              >
-                <i className="bi bi-arrow-counterclockwise me-2"></i>
-                Reset All Filters
-              </Button>
-            </Form>
+            {filterForm}
           </div>
-        </Col>
+        </div>
 
-        {/* Mobile Filters Offcanvas */}
-        <Offcanvas show={showFilters} onHide={() => setShowFilters(false)} placement="start" className="w-75">
-          <Offcanvas.Header closeButton className="bg-primary text-white">
-            <Offcanvas.Title>Filter Options</Offcanvas.Title>
-          </Offcanvas.Header>
-          <Offcanvas.Body>
-            <Form>
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Search</Form.Label>
-                <InputGroup>
-                  <InputGroup.Text>
-                    <i className="bi bi-search"></i>
-                  </InputGroup.Text>
-                  <Form.Control
-                    type="text"
-                    name="search"
-                    value={filters.search}
-                    onChange={handleFilterChange}
-                    placeholder="Search by name"
-                    aria-label="Search wheelchairs by name"
-                  />
-                </InputGroup>
-              </Form.Group>
+        <Dialog open={showFilters} onOpenChange={setShowFilters}>
+          <DialogContent className="max-h-[85vh] overflow-y-auto">
+            <div className="mb-4 border-b pb-2 font-semibold text-primary">{t('catalog.filterOptions')}</div>
+            {filterForm}
+            <Button className="mt-4 w-full" onClick={() => setShowFilters(false)}>{t('catalog.applyFilters')}</Button>
+          </DialogContent>
+        </Dialog>
 
-              <Form.Group className="mb-4">
-                <Form.Label className="fw-semibold">Wheelchair Type</Form.Label>
-                <Form.Select
-                  name="type"
-                  value={filters.type}
-                  onChange={handleFilterChange}
-                  aria-label="Filter by wheelchair type"
-                >
-                  <option value="">All Types</option>
-                  {uniqueTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </Form.Select>
-              </Form.Group>
-
-              <div className="mb-4">
-                <Form.Check
-                  type="switch"
-                  id="mobileInStockOnly"
-                  label="In Stock Only"
-                  name="inStockOnly"
-                  checked={filters.inStockOnly}
-                  onChange={handleFilterChange}
-                  className="mb-2 fw-semibold"
-                />
-
-                <Form.Check
-                  type="switch"
-                  id="mobileShowNewOnly"
-                  label="New Arrivals Only"
-                  name="showNewOnly"
-                  checked={filters.showNewOnly}
-                  onChange={handleFilterChange}
-                  className="fw-semibold"
-                />
-              </div>
-
-              <div className="d-grid gap-2">
-                <Button
-                  variant="primary"
-                  onClick={() => setShowFilters(false)}
-                >
-                  Apply Filters
-                </Button>
-                <Button
-                  variant="outline-secondary"
-                  onClick={resetFilters}
-                >
-                  Reset All Filters
-                </Button>
-              </div>
-            </Form>
-          </Offcanvas.Body>
-        </Offcanvas>
-
-        {/* Wheelchair Listings */}
-        <Col md={9}>
-          {/* Results Summary */}
-          <div className="d-flex justify-content-between align-items-center mb-4 bg-white p-3 rounded-3 shadow-sm">
-            <span className="fw-semibold">
-              {filteredWheelchairs.length} {filteredWheelchairs.length === 1 ? 'product' : 'products'} found
+        <div className="md:col-span-3">
+          <div className="mb-4 flex items-center justify-between gap-2 rounded-lg bg-card p-3 shadow-sm">
+            <span className="text-sm font-semibold">
+              {t('catalog.found', { count: filtered.length })}
             </span>
-            <div className="d-flex gap-1 align-items-center">
-              <span className="text-muted d-none d-sm-block">Sort by:</span>
-              <Form.Select size="sm" className="w-auto">
-                <option>Latest</option>
-                <option>Price: Low to High</option>
-                <option>Price: High to Low</option>
-                <option>Most Popular</option>
-              </Form.Select>
+            <div className="flex items-center gap-2">
+              <span className="hidden text-sm text-muted-foreground sm:block">{t('catalog.sortBy')}</span>
+              <Select value={sort} onValueChange={setSort}>
+                <SelectTrigger className="h-9 w-auto text-sm" aria-label={t('catalog.sortBy')}><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(SORTS).map(([v, l]) => <SelectItem key={v} value={v}>{l}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </div>
 
-          {/* Product Grid */}
-          <Row className="g-4">
-            {filteredWheelchairs.length > 0 ? (
-              filteredWheelchairs.map(wheelchair => (
-                <Col key={wheelchair.ID_FAUTEUIL} xs={12} sm={6} lg={4}>
-                  <Card className="h-100 w-100 shadow border-0 rounded-3 overflow-hidden transition-hover">
-                    {/* Wheelchair Image */}
-                    <div 
-                      className="position-relative" 
-                      style={{ height: "220px", overflow: 'hidden', cursor: 'pointer' }}
-                      onClick={() => navigate(`/wheelchairs/${wheelchair.ID_FAUTEUIL}`)}
-                    >
-                      <div className="hover-zoom h-100">
-                        <img
-                          src={wheelchair.imageUrl}
-                          alt={`${wheelchair.NOM_TYPE} wheelchair`}
-                          className="img-fluid h-100 w-100 object-fit-cover"
-                          onError={(e) => {
-                            e.target.onerror = null; // Prevent infinite loop
-                            e.target.src = defaultWheelchair;
-                          }}
-                          loading="lazy"
-                        />
-                      </div>
-                      
-                      {/* Status Badges */}
-                      <div className="position-absolute top-0 start-0 p-2 d-flex flex-column gap-1">
-                        {wheelchair.isNew && (
-                          <Badge 
-                            pill 
-                            bg="danger" 
-                            className="px-2 py-1"
-                            aria-label="New arrival"
-                          >
-                            <i className="bi bi-stars me-1"></i> New
-                          </Badge>
-                        )}
-                      </div>
-                      
-                      <div className="position-absolute top-0 end-0 p-2 d-flex flex-column gap-1">
-                        {wheelchair.hasOptions && (
-                          <OverlayTrigger
-                            placement="left"
-                            overlay={<Tooltip>Customization options available</Tooltip>}
-                          >
-                            <Badge 
-                              pill 
-                              bg="success" 
-                              className="px-2 py-1"
-                              aria-label="Has options"
-                            >
-                              <i className="bi bi-gear me-1"></i> Options
-                            </Badge>
-                          </OverlayTrigger>
-                        )}
-                      </div>
-                      
-                      {wheelchair.QT_STOCK <= 3 && wheelchair.QT_STOCK > 0 && (
-                        <Badge 
-                          pill 
-                          bg="warning" 
-                          text="dark"
-                          className="position-absolute bottom-0 end-0 m-2 px-2 py-1"
-                          aria-label="Low stock"
-                        >
-                          <i className="bi bi-exclamation-triangle me-1"></i> Low Stock
+          {filtered.length === 0 ? (
+            <div className="rounded-lg bg-card p-8 text-center shadow-sm">
+              <Search className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
+              <h3 className="mb-2">{t('catalog.noResults')}</h3>
+              <p className="mb-4 text-muted-foreground">{t('catalog.adjustFilters')}</p>
+              <Button onClick={reset}><RotateCcw className="h-4 w-4" /> {t('catalog.resetFilters')}</Button>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filtered.map((w) => (
+                <Card key={w.ID_FAUTEUIL} className="flex flex-col overflow-hidden">
+                  <div className="relative cursor-pointer overflow-hidden" onClick={() => navigate(`/wheelchairs/${w.ID_FAUTEUIL}`)}>
+                    <img
+                      src={w.imageUrl}
+                      alt={t('catalog.altWheelchair', { name: w.NOM_TYPE })}
+                      className="h-[220px] w-full object-cover transition-transform hover:scale-105"
+                      loading="lazy"
+                      onError={(e) => { e.target.onerror = null; e.target.src = defaultWheelchair; }}
+                    />
+                    <div className="absolute left-0 top-0 flex flex-col gap-1 p-2">
+                      {w.isNew && (
+                        <Badge variant="destructive"><Sparkles className="mr-1 h-3 w-3" /> {t('catalog.newBadge')}</Badge>
+                      )}
+                    </div>
+                    <div className="absolute right-0 top-0 flex flex-col gap-1 p-2">
+                      {w.hasOptions && (
+                        <Badge className="bg-green-600 hover:bg-green-600" title={t('catalog.optionsTitle')}>
+                          <Settings className="mr-1 h-3 w-3" /> {t('catalog.optionsBadge')}
                         </Badge>
                       )}
                     </div>
-
-                    <Card.Body className="d-flex flex-column p-4">
-                      <Card.Title 
-                        className="h5 mb-3"
-                        style={{ cursor: 'pointer' }}
-                        onClick={() => navigate(`/wheelchairs/${wheelchair.ID_FAUTEUIL}`)}
-                      >
-                        {wheelchair.NOM_TYPE}
-                      </Card.Title>
-                      
-                      <div className="mb-3">
-                        <span className="badge bg-light text-dark me-2">Type: {wheelchair.NOM_TYPE}</span>
-                      </div>
-                      
-                      <div className="mt-auto "   >
-                        <div className="d-flex justify-content-between align-items-center mb-3  flex-column">
-                          <span className="text-success fw-bold fs-4">
-                            {Number(wheelchair.PRIX).toFixed(2)} DT  
-                          </span>
-                          <br />  
-                          <span 
-                          
-                            className={`badge ${wheelchair.QT_STOCK > 0 ? "bg-success" : "bg-danger"}`}
-                            aria-label={`Stock status: ${wheelchair.QT_STOCK > 0 ? `${wheelchair.QT_STOCK} in stock` : 'Out of stock'}`}
-                          >
-                            {wheelchair.QT_STOCK > 0 ? `${wheelchair.QT_STOCK} in stock` : "Out of stock"}
-                          </span>
-                        </div>
-                        <div className="d-grid gap-2">
-                          <Button 
-                            variant="primary"
-                            size="lg"
-                            className="shadow-sm"
-                            onClick={() => navigate(`/wheelchairs/${wheelchair.ID_FAUTEUIL}`)}
-                            disabled={wheelchair.QT_STOCK <= 0}
-                            aria-label={`View details for ${wheelchair.NOM_TYPE}`}
-                          >
-                            <i className="bi bi-info-circle me-2"></i> View Details
-                          </Button>
-                          {wheelchair.QT_STOCK > 0 && (
-                            <Button 
-                              variant="outline-primary"
-                              className="shadow-sm"
-                              aria-label={`Add ${wheelchair.NOM_TYPE} to cart`}
-                            >
-                              <i className="bi bi-cart-plus me-2"></i> Add to Cart
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </Card.Body>
-                  </Card>
-                </Col>
-              ))
-            ) : (
-              <Col className="text-center py-5">
-                <div className="p-5 bg-white rounded-3 shadow-sm">
-                  <i className="bi bi-search display-1 text-muted mb-3"></i>
-                  <h3 className="text-muted mb-3">No matching wheelchairs found</h3>
-                  <p className="text-muted mb-4">Try adjusting your filters to find what you're looking for</p>
-                  <Button
-                    variant="primary"
-                    size="lg"
-                    onClick={resetFilters}
-                    className="shadow"
-                    aria-label="Reset all filters"
-                  >
-                    <i className="bi bi-arrow-counterclockwise me-2"></i> Reset All Filters
-                  </Button>
-                </div>
-              </Col>
-            )}
-          </Row>
-          
-          {/* Pagination */}
-          {filteredWheelchairs.length > 0 && (
-            <nav className="mt-5 d-flex justify-content-center">
-              <ul className="pagination pagination-lg">
-                <li className="page-item disabled">
-                  <a className="page-link" href="#" tabIndex="-1">Previous</a>
-                </li>
-                <li className="page-item active">
-                  <a className="page-link" href="#">1</a>
-                </li>
-                <li className="page-item">
-                  <a className="page-link" href="#">2</a>
-                </li>
-                <li className="page-item">
-                  <a className="page-link" href="#">3</a>
-                </li>
-                <li className="page-item">
-                  <a className="page-link" href="#">Next</a>
-                </li>
-              </ul>
-            </nav>
+                    {w.QT_STOCK <= 3 && w.QT_STOCK > 0 && (
+                      <Badge variant="secondary" className="absolute bottom-2 right-2 bg-yellow-400 text-yellow-950 hover:bg-yellow-400">
+                        <TriangleAlert className="mr-1 h-3 w-3" /> {t('catalog.lowStock')}
+                      </Badge>
+                    )}
+                  </div>
+                  <CardContent className="flex flex-1 flex-col p-4">
+                    <h5 className="mb-1 cursor-pointer text-lg font-semibold" onClick={() => navigate(`/wheelchairs/${w.ID_FAUTEUIL}`)}>
+                      {w.NOM_TYPE}
+                    </h5>
+                    <p className="mb-3 text-sm text-muted-foreground">{w.PROPULTION ? t('catalog.electric') : t('catalog.manual')}</p>
+                    <div className="mt-auto flex items-center justify-between gap-2">
+                      <span className="text-xl font-bold">{Number(w.PRIX).toFixed(2)} DT</span>
+                      <span className={cn('rounded-full px-2.5 py-0.5 text-xs font-semibold text-white', w.QT_STOCK > 0 ? 'bg-green-600' : 'bg-red-600')}>
+                        {w.QT_STOCK > 0 ? t('catalog.inStockCount', { count: w.QT_STOCK }) : t('catalog.outOfStock')}
+                      </span>
+                    </div>
+                    <Button className="mt-3" onClick={() => navigate(`/wheelchairs/${w.ID_FAUTEUIL}`)}>
+                      <Info className="h-4 w-4" /> {t('catalog.viewDetails')}
+                    </Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           )}
-        </Col>
-      </Row>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
-};
-
-WheelchairsPage.propTypes = {
-  // Add prop types if needed
 };
 
 export default WheelchairsPage;

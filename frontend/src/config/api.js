@@ -31,6 +31,8 @@ export function authHeaders(extra = {}) {
   const token = localStorage.getItem('token');
   const headers = {
     Accept: 'application/json',
+    // ponytail: single locale source for backend strings, i18n owns the value
+    'Accept-Language': localStorage.getItem('wm-lang') || 'en',
     ...extra,
   };
   if (token) {

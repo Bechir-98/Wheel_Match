@@ -1,9 +1,16 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { apiUrl } from '../config/api.js';
 import { useAuth } from '../context/AuthContext.jsx';
+import { Card, CardContent } from '../components/ui/card.jsx';
+import { Button } from '../components/ui/button.jsx';
+import { Input } from '../components/ui/input.jsx';
+import { Label } from '../components/ui/label.jsx';
+import { Alert } from '../components/ui/alert.jsx';
 
 function Log() {
+  const { t } = useTranslation();
   const [error, setError] = useState('');
   const [debugInfo, setDebugInfo] = useState(null);
   const navigate = useNavigate();
@@ -13,16 +20,17 @@ function Log() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
-    
+
     try {
       console.log('Sending login request...');
       console.log('Form data:', Object.fromEntries(formData));
-      
+
       const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         body: formData,
         headers: {
           Accept: 'application/json',
+          'Accept-Language': localStorage.getItem('wm-lang') || 'en',
         },
         mode: 'cors',
       });
@@ -35,7 +43,7 @@ function Log() {
       try {
         data = JSON.parse(raw);
       } catch {
-        setError(`Server error (${response.status}). Is the API running?`);
+        setError(t('auth.serverErrorApi', { status: response.status }));
         return;
       }
 
@@ -50,9 +58,7 @@ function Log() {
         );
         return;
       }
-      console.log('Response data:', data);
-
-      if (data.success) {
+      console.log('Response data:', data);      if (data.success) {
         if (data.token) {
           localStorage.setItem('token', data.token);
         }
@@ -75,58 +81,52 @@ function Log() {
         navigate(dest);
       } else {
         // Login failed
-        setError(data.error || 'Invalid credentials');
+        setError(data.error || t('auth.invalidCredentials'));
         setDebugInfo(data.debug);
       }
     } catch (err) {
       console.error('Login error:', err);
       if (err.message.includes('Failed to fetch')) {
-        setError('Cannot connect to the server. Please check if the server is running.');
+        setError(t('auth.cannotConnect'));
       } else if (err.message.includes('HTTP error')) {
-        setError('Server error. Please try again later.');
+        setError(t('auth.serverErrorLater'));
       } else {
-        setError('An error occurred during login. Please try again.');
+        setError(t('auth.loginErrorGeneric'));
       }
     }
   };
 
   return (
-    <div className='form'>
-      {error && <div className="error-message">{error}</div>}
-      
-      {debugInfo && (
-        <div className="debug-info" style={{ 
-          marginTop: '20px', 
-          padding: '10px', 
-          backgroundColor: '#f8f9fa', 
-          border: '1px solid #ddd',
-          borderRadius: '4px'
-        }}>
-          <h4>Debug Information:</h4>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>
-            {JSON.stringify(debugInfo, null, 2)}
-          </pre>
-        </div>
-      )}
-      
-      <div className='formm'>
-        <form onSubmit={handleSubmit}>
-          <br />
-          <label htmlFor="mail">Email Address</label>
-          <input type="email" id="mail" name="mail" placeholder="Email Address" required />
-          <br />
+    <div className="mx-auto flex max-w-6xl justify-center px-4 py-8">
+      <Card className="w-full max-w-md">
+        <CardContent className="flex flex-col gap-4 pt-6">
+          {error && <Alert variant="destructive">{error}</Alert>}
 
-          <label htmlFor="password">Password</label>
-          <input type="password" id="password" name="password" placeholder="Password" required />
-          <br />
+          {debugInfo && (
+            <div className="rounded-md border bg-muted p-2.5">
+              <h4 className="font-medium">{t('auth.debugInfo')}</h4>
+              <pre className="whitespace-pre-wrap text-xs">
+                {JSON.stringify(debugInfo, null, 2)}
+              </pre>
+            </div>
+          )}
 
-          <button type="submit" className="logbut">Login</button>
-          <br /><br />
-          <p>
-            Don't have an account? <Link to="/sign">Sign here</Link>
-          </p>
-        </form>
-      </div>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+            <div className="grid gap-1.5">
+              <Label htmlFor="mail">{t('auth.email')}</Label>
+              <Input type="email" id="mail" name="mail" placeholder={t('auth.email')} required />
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="password">{t('auth.password')}</Label>
+              <Input type="password" id="password" name="password" placeholder={t('auth.password')} required />
+            </div>
+            <Button type="submit" className="w-full">{t('auth.login')}</Button>
+            <p className="text-sm text-muted-foreground">
+              {t('auth.noAccount')} <Link to="/sign" className="text-primary underline-offset-4 hover:underline">{t('auth.signHere')}</Link>
+            </p>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
