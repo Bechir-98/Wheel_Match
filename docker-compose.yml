@@ -1,0 +1,54 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: wheel
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./backend/scripts/schema_postgresql.sql:/docker-entrypoint-initdb.d/01-schema.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+    environment:
+      - SLM_URL=http://slm:11434
+    volumes:
+      - ./backend/app:/app/app
+      - ./backend/uploads:/app/uploads
+
+  # ponytail: CPU-only Ollama sidecar; rule ranking serves when slm is down
+  slm:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama-models:/root/.ollama
+    environment:
+      - OLLAMA_MODELS=/root/.ollama
+    command: sh -c "ollama serve & sleep 5; ollama pull qwen2.5:0.5b; wait"
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      - DOCKER=1
+
+volumes:
+  pgdata:
+  ollama-models:
