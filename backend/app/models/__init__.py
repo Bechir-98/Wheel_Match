@@ -1,12 +1,15 @@
 from app.models.tables import (
     AvoirOption,
-    Clinicien,
     Comercant,
     ComposerDe,
     Composant,
     Consultation,
+    Conversation,
     EstAssocie,
     Fauteuil,
+    KBChunk,
+    MedicalEntry,
+    Message,
     Morphologie,
     Option,
     Pathologie,
@@ -21,7 +24,6 @@ from app.models.tables import (
 __all__ = [
     "Utilisateur",
     "Patient",
-    "Clinicien",
     "Comercant",
     "Fauteuil",
     "TypeFauteuil",
@@ -37,4 +39,8 @@ __all__ = [
     "UserPreferences",
     "PatientMedical",
     "DemandeFauteuil",
+    "Conversation",
+    "Message",
+    "KBChunk",
+    "MedicalEntry",
 ]

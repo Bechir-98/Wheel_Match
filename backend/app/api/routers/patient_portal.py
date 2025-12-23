@@ -8,7 +8,6 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_patient
 from app.models import (
-    Clinicien,
     Consultation,
     EstAssocie,
     Fauteuil,
@@ -19,22 +18,18 @@ from app.models import (
     TypeFauteuil,
 )
 from app.schemas.demandes import DemandeCreate, DemandeOut
+from app.services.messaging import unread_count
 from fastapi import HTTPException, status
 
 router = APIRouter()
 
 
-def _clinician_display_name(db: Session, clinician_user_id: int) -> str:
-    c = db.query(Clinicien).filter(Clinicien.ID_UTILISATUER == clinician_user_id).first()
-    if c:
-        parts = [str(c.PRENOMC or "").strip(), str(c.NOMC or "").strip()]
-        name = " ".join(x for x in parts if x).strip()
-        if name:
-            return name
-    u = db.query(Utilisateur).filter(Utilisateur.ID_UTILISATUER == clinician_user_id).first()
+def _record_author_name(db: Session, author_user_id: int) -> str:
+    """Historical consultations predate the SLM; resolve author to email prefix."""
+    u = db.query(Utilisateur).filter(Utilisateur.ID_UTILISATUER == author_user_id).first()
     if u and u.EMAIL:
         return u.EMAIL.split("@")[0]
-    return "Clinician"
+    return "—"
 
 
 @router.get("/dashboard")
@@ -62,7 +57,7 @@ def patient_dashboard(
                 "date_consultation": d.isoformat() if d else None,
                 "pathology_name": (patho.NOM_PAT or "").strip() or "—",
                 "morphology": (c.NOM_ORG or "").strip() or "—",
-                "clinician_name": _clinician_display_name(db, c.ID_UTILISATUER),
+                "clinician_name": _record_author_name(db, c.ID_UTILISATUER),
                 "is_upcoming": bool(d and d >= today),
             }
         )
@@ -113,7 +108,7 @@ def patient_dashboard(
             "medical_record_filled": medical_filled,
             "matched_wheelchairs": matched_wheelchairs,
             "catalog_wheelchairs": catalog_wheelchairs,
-            "messages_unread": 0,
+            "messages_unread": unread_count(db, uid),
             "profile_completion_pct": profile_completion_pct,
         },
         "consultations": consultations_out,
@@ -130,20 +125,22 @@ def create_request(
     f = db.query(Fauteuil).filter(Fauteuil.ID_FAUTEUIL == demande.id_fauteuil).first()
     if not f:
         raise HTTPException(status_code=404, detail="Fauteuil not found")
-    
-    # Check if already requested and pending
-    existing = db.query(DemandeFauteuil).filter(
+
+    # One active demande per patient+chair; re-request only after REJETE
+    active = db.query(DemandeFauteuil).filter(
         DemandeFauteuil.ID_PATIENT == user.ID_UTILISATUER,
         DemandeFauteuil.ID_FAUTEUIL == demande.id_fauteuil,
-        DemandeFauteuil.STATUT == "EN_ATTENTE"
+        DemandeFauteuil.STATUT.in_(["EN_ATTENTE", "APPROUVE"])
     ).first()
-    if existing:
-        raise HTTPException(status_code=400, detail="Request already pending for this wheelchair")
-        
+    if active:
+        raise HTTPException(status_code=400, detail="An active request already exists for this wheelchair")
+
     db_demande = DemandeFauteuil(
         ID_PATIENT=user.ID_UTILISATUER,
         ID_FAUTEUIL=demande.id_fauteuil,
-        STATUT="EN_ATTENTE"
+        STATUT="APPROUVE",
+        ORIGIN="slm",
+        PATIENT_ACCEPT=None,
     )
     db.add(db_demande)
     db.commit()
@@ -172,7 +169,35 @@ def get_patient_requests(
             "NOM_TYPE": nom_type,
             "STATUT": d.STATUT,
             "NOTES_CLINICIEN": d.NOTES_CLINICIEN,
+            "ORIGIN": d.ORIGIN or "patient",
+            "PATIENT_ACCEPT": d.PATIENT_ACCEPT,
             "DATE_DEMANDE": d.DATE_DEMANDE.isoformat() if d.DATE_DEMANDE else None,
             "DATE_MAJ": d.DATE_MAJ.isoformat() if d.DATE_MAJ else None,
         })
     return out
+
+
+@router.post("/requests/{demande_id}/accept", response_model=DemandeOut)
+def accept_recommendation(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_patient),
+):
+    d = db.query(DemandeFauteuil).filter(
+        DemandeFauteuil.ID_DEMANDE == demande_id,
+        DemandeFauteuil.ID_PATIENT == user.ID_UTILISATUER,
+    ).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Request not found")
+    if d.ORIGIN not in ("clinician", "slm") or d.STATUT != "APPROUVE":
+        raise HTTPException(status_code=400, detail="Only recommended wheelchairs can be accepted")
+    if d.PATIENT_ACCEPT:
+        raise HTTPException(status_code=400, detail="Already accepted")
+    f = db.query(Fauteuil).filter(Fauteuil.ID_FAUTEUIL == d.ID_FAUTEUIL).first()
+    if not f or (f.QT_STOCK or 0) <= 0:
+        raise HTTPException(status_code=409, detail="Out of stock")
+    f.QT_STOCK = int(f.QT_STOCK) - 1
+    d.PATIENT_ACCEPT = True
+    db.commit()
+    db.refresh(d)
+    return d

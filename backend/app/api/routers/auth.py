@@ -4,9 +4,10 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.models import Clinicien, Comercant, Patient, Utilisateur
+from app.models import Comercant, Patient, Utilisateur
 from app.schemas.auth import RegisterRequest
 from app.services.user_profile import build_display_name
+from app.services.messaging import locale_of, text
 from app.services.auth_service import (
     create_access_token,
     find_user_by_email,
@@ -19,9 +20,9 @@ from app.services.auth_service import (
 
 router = APIRouter()
 
+# ponytail: auth errors use the {success, error} envelope with HTTP 200, never bare statuses
 REDIRECTS = {
     "patient": "/patient-dashboard",
-    "clinician": "/clinician-dashboard",
     "vendor": "/vendor-dashboard",
 }
 
@@ -45,7 +46,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
     if not email or not password:
         return {
             "success": False,
-            "error": "Email and password are required",
+            "error": text("credentials_required", request.headers.get("accept-language")),
             "redirect": None,
         }
 
@@ -53,7 +54,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
     if not user or not verify_password(password, user.PASSWORD or ""):
         return {
             "success": False,
-            "error": "Invalid email or password",
+            "error": text("invalid_credentials", request.headers.get("accept-language")),
             "redirect": None,
         }
 
@@ -61,7 +62,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
     if not role:
         return {
             "success": False,
-            "error": "User type not found",
+            "error": text("user_type_missing", request.headers.get("accept-language")),
             "redirect": None,
         }
 
@@ -97,15 +98,15 @@ def _parse_bool(v) -> int:
 
 
 @router.post("/register")
-def register(body: RegisterRequest, db: Session = Depends(get_db)):
+def register(body: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     email_norm = normalize_email(body.email)
     if not email_norm:
-        return {"success": False, "error": "Email is required"}
+        return {"success": False, "error": text("email_required", request.headers.get("accept-language"))}
     if not body.password or len(body.password) < 1:
-        return {"success": False, "error": "Password is required"}
+        return {"success": False, "error": text("password_required", request.headers.get("accept-language"))}
 
     if find_user_by_email(db, email_norm):
-        return {"success": False, "error": "Email already registered"}
+        return {"success": False, "error": text("email_registered", request.headers.get("accept-language"))}
 
     u = Utilisateur(
         EMAIL=email_norm,
@@ -131,15 +132,6 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
                     AIDANT=_parse_bool(body.aidant),
                 )
             )
-        elif prof == "2":
-            db.add(
-                Clinicien(
-                    ID_UTILISATUER=u.ID_UTILISATUER,
-                    NOMC=(body.nomc or "").strip(),
-                    PRENOMC=(body.prenomc or "").strip(),
-                    SPECIALITE=(body.specialite or "").strip(),
-                )
-            )
         elif prof == "4":
             db.add(
                 Comercant(
@@ -149,7 +141,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
             )
         else:
             db.rollback()
-            return {"success": False, "error": "Invalid profession"}
+            return {"success": False, "error": text("invalid_profession", request.headers.get("accept-language"))}
         db.commit()
     except Exception as e:
         db.rollback()
@@ -157,7 +149,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
 
     role = resolve_role(db, u.ID_UTILISATUER)
     if not role:
-        return {"success": False, "error": "Registration incomplete"}
+        return {"success": False, "error": text("registration_incomplete", request.headers.get("accept-language"))}
 
     token = create_access_token(
         str(u.ID_UTILISATUER),

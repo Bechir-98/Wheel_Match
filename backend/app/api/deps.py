@@ -45,15 +45,6 @@ def get_current_user_with_role(
     return user, role
 
 
-def require_clinician(
-    ctx: Annotated[tuple[Utilisateur, str], Depends(get_current_user_with_role)],
-) -> Utilisateur:
-    user, role = ctx
-    if role != "clinician":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Clinician only")
-    return user
-
-
 def require_patient(
     ctx: Annotated[tuple[Utilisateur, str], Depends(get_current_user_with_role)],
 ) -> Utilisateur:

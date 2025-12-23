@@ -16,7 +16,7 @@ class RegisterRequest(BaseModel):
 
     email: str
     password: str
-    profession: str = Field(..., description="1=patient, 2=clinician, 4=vendor")
+    profession: str = Field(..., description="1=patient, 4=vendor")
     address: str = ""
     phone: str = ""
     nomp: str | None = None

@@ -2,29 +2,7 @@ from decimal import Decimal
 
 from sqlalchemy.orm import Session
 
-from app.models import Clinicien, Comercant, Patient, Utilisateur
-
-SPEC_LABEL_TO_ID = {
-    "rééducation": "1",
-    "orthopédie": "2",
-    "neurologie": "3",
-}
-
-
-def specialty_to_id_spec(spec: str | None) -> str:
-    if not spec:
-        return "1"
-    s = spec.strip()
-    if s.isdigit():
-        return s
-    return SPEC_LABEL_TO_ID.get(s.lower(), "1")
-
-
-def id_spec_to_label(spec_id: str | None) -> str:
-    m = {"1": "Rééducation", "2": "Orthopédie", "3": "Neurologie"}
-    if spec_id and spec_id in m:
-        return m[spec_id]
-    return spec_id or ""
+from app.models import Comercant, Patient, Utilisateur
 
 
 def build_display_name(db: Session, user: Utilisateur, role: str) -> str:
@@ -33,13 +11,6 @@ def build_display_name(db: Session, user: Utilisateur, role: str) -> str:
         p = db.query(Patient).filter(Patient.ID_UTILISATUER == user.ID_UTILISATUER).first()
         if p:
             parts = [str(p.PRENOMP or "").strip(), str(p.NOMP or "").strip()]
-            name = " ".join(x for x in parts if x).strip()
-            if name:
-                return name
-    elif role == "clinician":
-        c = db.query(Clinicien).filter(Clinicien.ID_UTILISATUER == user.ID_UTILISATUER).first()
-        if c:
-            parts = [str(c.PRENOMC or "").strip(), str(c.NOMC or "").strip()]
             name = " ".join(x for x in parts if x).strip()
             if name:
                 return name
@@ -82,26 +53,6 @@ def build_profile_payload(db: Session, user: Utilisateur, role: str) -> dict:
                     "TAILLE": float(p.TAILLE) if p.TAILLE is not None else "",
                     "UTILISATION_PRPL": p.UTILISATION_PRPL or "",
                     "AIDANT": bool(p.AIDANT) if p.AIDANT is not None else False,
-                }
-            )
-    elif role == "clinician":
-        base.update(
-            {
-                "NOMC": "",
-                "PRENOMC": "",
-                "ID_SPEC": "1",
-                "specialite": id_spec_to_label("1"),
-            }
-        )
-        c = db.query(Clinicien).filter(Clinicien.ID_UTILISATUER == user.ID_UTILISATUER).first()
-        if c:
-            sid = specialty_to_id_spec(c.SPECIALITE)
-            base.update(
-                {
-                    "NOMC": c.NOMC or "",
-                    "PRENOMC": c.PRENOMC or "",
-                    "ID_SPEC": sid,
-                    "specialite": id_spec_to_label(sid),
                 }
             )
     elif role == "vendor":
@@ -147,15 +98,6 @@ def apply_profile_update(db: Session, user: Utilisateur, role: str, data: dict) 
                 p.TAILLE = Decimal(str(data["TAILLE"]))
             if "AIDANT" in data:
                 p.AIDANT = 1 if data["AIDANT"] else 0
-    elif role == "clinician":
-        c = db.query(Clinicien).filter(Clinicien.ID_UTILISATUER == user.ID_UTILISATUER).first()
-        if c:
-            if "NOMC" in data and data["NOMC"] is not None:
-                c.NOMC = str(data["NOMC"]).strip()
-            if "PRENOMC" in data and data["PRENOMC"] is not None:
-                c.PRENOMC = str(data["PRENOMC"]).strip()
-            if "ID_SPEC" in data and data["ID_SPEC"] is not None:
-                c.SPECIALITE = str(data["ID_SPEC"]).strip()
     elif role == "vendor":
         v = db.query(Comercant).filter(Comercant.ID_UTILISATUER == user.ID_UTILISATUER).first()
         if v and "NOM_MARCHAND" in data and data["NOM_MARCHAND"] is not None:

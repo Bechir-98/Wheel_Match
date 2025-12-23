@@ -11,7 +11,10 @@ from sqlalchemy import (
     Text,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
+
+from pgvector.sqlalchemy import Vector
 
 from app.db.session import Base
 
@@ -41,17 +44,6 @@ class Patient(Base):
     utilisateur = relationship("Utilisateur", backref="patient_profile", foreign_keys=[ID_UTILISATUER])
 
 
-class Clinicien(Base):
-    __tablename__ = "CLINICIEN"
-
-    ID_UTILISATUER = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), primary_key=True)
-    NOMC = Column(String(64))
-    PRENOMC = Column(String(64))
-    SPECIALITE = Column(String(64))
-
-    utilisateur = relationship("Utilisateur", backref="clinicien_profile", foreign_keys=[ID_UTILISATUER])
-
-
 class Comercant(Base):
     __tablename__ = "COMERCANT"
 
@@ -77,6 +69,8 @@ class Fauteuil(Base):
     PROPULTION = Column(Integer, nullable=False)
     PRIX = Column(Numeric(10, 2), nullable=False)
     QT_STOCK = Column(Integer, nullable=False)
+    # ponytail: local upload path, S3/CDN when multi-instance
+    IMAGE = Column(String(512), nullable=True)
 
     type_fauteuil = relationship("TypeFauteuil", backref="fauteuils")
     vendeur = relationship("Utilisateur", backref="fauteuils_vendus", foreign_keys=[ID_UTILISATUER])
@@ -156,7 +150,7 @@ class UserPreferences(Base):
 
 
 class PatientMedical(Base):
-    """Stores clinician-entered morphology/pathology/notes (no equivalent in legacy schema)."""
+    """Latest snapshot; see MedicalEntry for append-only history."""
 
     __tablename__ = "PATIENT_MEDICAL"
 
@@ -169,14 +163,77 @@ class PatientMedical(Base):
 
 class DemandeFauteuil(Base):
     __tablename__ = "DEMANDE_FAUTEUIL"
+    __tablename__ = "DEMANDE_FAUTEUIL"
 
     ID_DEMANDE = Column(Integer, primary_key=True, autoincrement=True)
     ID_PATIENT = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
     ID_FAUTEUIL = Column(Integer, ForeignKey("FAUTEUIL.ID_FAUTEUIL"), nullable=False)
     STATUT = Column(String(32), nullable=False, default="EN_ATTENTE")
     NOTES_CLINICIEN = Column(Text, nullable=True)
+    # ponytail: origin+accept drive the two flows; add when vendor counters need more
+    ORIGIN = Column(String(16), nullable=False, default="patient")
+    PATIENT_ACCEPT = Column(Boolean, nullable=True)
     DATE_DEMANDE = Column(DateTime, server_default=func.now())
     DATE_MAJ = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
     patient = relationship("Utilisateur", foreign_keys=[ID_PATIENT])
     fauteuil = relationship("Fauteuil", foreign_keys=[ID_FAUTEUIL])
+
+
+class Conversation(Base):
+    """1:1 thread, always patient + vendor. Created on first message."""
+
+    __tablename__ = "CONVERSATION"
+
+    ID = Column(Integer, primary_key=True, autoincrement=True)
+    PATIENT_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False, index=True)
+    OTHER_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False, index=True)
+    DEMANDE_ID = Column(Integer, ForeignKey("DEMANDE_FAUTEUIL.ID_DEMANDE"), nullable=True)
+    UPDATED_AT = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class Message(Base):
+    __tablename__ = "MESSAGE"
+
+    ID = Column(Integer, primary_key=True, autoincrement=True)
+    CONV_ID = Column(Integer, ForeignKey("CONVERSATION.ID", ondelete="CASCADE"), nullable=False, index=True)
+    SENDER_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
+    TEXT = Column(Text, nullable=False)
+    # ponytail: single read flag, per-recipient receipts when needed
+    IS_READ = Column(Boolean, nullable=False, default=False)
+    CREATED_AT = Column(DateTime, server_default=func.now())
+
+
+class KBChunk(Base):
+    """pgvector knowledge base. Exact cosine search until scale demands HNSW."""
+
+    __tablename__ = "KB_CHUNK"
+
+    ID = Column(String(128), primary_key=True)
+    TEXT = Column(Text, nullable=False)
+    TYPE = Column(String(64), nullable=False, default="")
+    METADATA = Column(JSONB, nullable=False, default=dict)
+    EMBEDDING = Column(Vector(3072))
+
+
+class MedicalEntry(Base):
+    """Append-only clinical assessments; PatientMedical mirrors the latest."""
+
+    __tablename__ = "MEDICAL_ENTRY"
+
+    ID = Column(Integer, primary_key=True, autoincrement=True)
+    PATIENT_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False, index=True)
+    CLINICIAN_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
+    DIAGNOSIS = Column(String(128), nullable=False)
+    ONSET_DATE = Column(Date, nullable=True)
+    SEVERITY = Column(String(16), nullable=True)
+    AFFECTED_AREAS = Column(Text, nullable=True)
+    MORPHOLOGY = Column(String(128), nullable=False)
+    SEAT_WIDTH_CM = Column(Numeric(5, 1), nullable=True)
+    SEAT_DEPTH_CM = Column(Numeric(5, 1), nullable=True)
+    BACKREST_HEIGHT_CM = Column(Numeric(5, 1), nullable=True)
+    TRANSFERS = Column(String(16), nullable=True)
+    PROPULSION_RECO = Column(String(16), nullable=True)
+    NOTES = Column(Text, nullable=True)
+    FOLLOWUP_DATE = Column(Date, nullable=True)
+    CREATED_AT = Column(DateTime, server_default=func.now())

@@ -6,7 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Clinicien, Comercant, Patient, Utilisateur
+from app.models import Comercant, Patient, Utilisateur
 
 
 def normalize_email(email: str | None) -> str:
@@ -46,8 +46,6 @@ def decode_token(token: str) -> dict | None:
 def resolve_role(db: Session, user_id: int) -> str | None:
     if db.query(Patient).filter(Patient.ID_UTILISATUER == user_id).first():
         return "patient"
-    if db.query(Clinicien).filter(Clinicien.ID_UTILISATUER == user_id).first():
-        return "clinician"
     if db.query(Comercant).filter(Comercant.ID_UTILISATUER == user_id).first():
         return "vendor"
     return None

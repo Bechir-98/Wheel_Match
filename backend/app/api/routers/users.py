@@ -31,6 +31,7 @@ def _default_prefs() -> dict[str, Any]:
         "AUTO_BACKUP": True,
         "BACKUP_FREQUENCY": "daily",
         "DATA_RETENTION": "30",
+        "LOW_STOCK": 5,
     }
 
 
@@ -65,8 +66,6 @@ def get_profile_legacy(
     if user.ID_UTILISATUER != id_utilisateur:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
     role = type.lower()
-    if role == "clinicien":
-        role = "clinician"
     if role == "commercant":
         role = "vendor"
     return build_profile_payload(db, user, role)
@@ -83,8 +82,6 @@ def post_profile_legacy(
     rtype = (body.get("type") or "").lower()
     if uid != user.ID_UTILISATUER:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    if rtype in ("clinicien", "clinician"):
-        rtype = "clinician"
     if rtype in ("commercant", "vendor"):
         rtype = "vendor"
     if rtype == "patient":
