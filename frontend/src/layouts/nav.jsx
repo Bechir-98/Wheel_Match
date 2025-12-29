@@ -1,10 +1,19 @@
-import React, { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import brand from '../assets/brand.png';
-import { Container, Nav, Navbar, NavDropdown } from 'react-bootstrap';
-import { PersonCircle } from 'react-bootstrap-icons';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Menu, User, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.jsx';
 import { apiUrl, authHeaders } from '../config/api.js';
+import { Button } from '../components/ui/button.jsx';
+import { useTranslation } from 'react-i18next';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '../components/ui/dropdown-menu.jsx';
+import { ThemeToggle } from '../components/theme-toggle.jsx';
+import { cn } from '@/lib/utils';
 
 function displayNameFromProfile(p) {
   if (!p || typeof p !== 'object') return '';
@@ -13,35 +22,27 @@ function displayNameFromProfile(p) {
     const s = `${p.PRENOMP || ''} ${p.NOMP || ''}`.trim();
     return s || (p.EMAIL || '').split('@')[0] || '';
   }
-  if (t === 'clinician') {
-    const s = `${p.PRENOMC || ''} ${p.NOMC || ''}`.trim();
-    return s || (p.EMAIL || '').split('@')[0] || '';
-  }
   if (t === 'vendor') {
     return (p.NOM_MARCHAND || '').trim() || (p.EMAIL || '').split('@')[0] || '';
   }
   return (p.EMAIL || '').split('@')[0] || '';
 }
 
+const LINKS = [
+  { to: '/', key: 'home' },
+  { to: '/wheelchairs', key: 'wheelchairs' },
+  { to: '/faq', key: 'faq' },
+  { to: '/about', key: 'about' },
+];
+
 function Navb() {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { isAuthenticated, user, logout, refreshSession } = useAuth();
+  const [open, setOpen] = useState(false);
 
-  const scrollToFooter = (e) => {
-    e.preventDefault();
-    const footer = document.getElementById('about');
-    if (footer) {
-      footer.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
-
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth',
-    });
-  };
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
   const handleLogout = () => {
     logout();
@@ -82,115 +83,123 @@ function Navb() {
 
   return (
     <>
-      <Navbar
-        bg="dark"
-        data-bs-theme="dark"
-        fixed="top"
-        expand="lg"
-        style={{ boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
-      >
-        <Container fluid style={{ padding: '0 20px' }}>
-          <Navbar.Brand as={Link} to="/" style={{ marginRight: 'auto' }} onClick={scrollToTop}>
-            <img
-              src={brand}
-              width="30"
-              height="30"
-              className="d-inline-block align-top"
-              alt="Wheel Match Logo"
-              loading="lazy"
-            />
-            <span style={{ marginLeft: '10px' }}>Wheel Match</span>
-          </Navbar.Brand>
+      <header className="fixed inset-x-0 top-0 z-40 border-b bg-background/95 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4">
+          <Link to="/" onClick={scrollToTop} className="mr-auto flex items-center gap-2 font-semibold">
+            <img src={brand} width="30" height="30" alt="Wheel Match Logo" loading="lazy" />
+            <span>Wheel Match</span>
+          </Link>
 
-          <Navbar.Toggle aria-controls="responsive-navbar-nav" className="border-0" />
+          <nav className="hidden items-center gap-1 lg:flex">
+            {LINKS.map((l) => (
+              <Button key={l.to} variant="ghost" asChild className={cn(location.pathname === l.to && 'bg-accent')}>
+                <Link to={l.to} onClick={scrollToTop}>
+                  {t(`nav.${l.key}`)}
+                </Link>
+              </Button>
+            ))}
+          </nav>
 
-          <Navbar.Collapse id="responsive-navbar-nav">
-            <Nav className="mx-auto">
-              <Nav.Link
-                as={Link}
-                to="/"
-                className={location.pathname === '/' ? 'active' : ''}
-                onClick={scrollToTop}
-              >
-                Home
-              </Nav.Link>
-              <Nav.Link
-                as={Link}
-                to="/wheelchairs"
-                className={location.pathname === '/wheelchairs' ? 'active' : ''}
-                onClick={scrollToTop}
-              >
-                Wheelchairs
-              </Nav.Link>
-              <Nav.Link as={Link} to="/faq" onClick={scrollToTop}>
-                FAQ
-              </Nav.Link>
-              <Nav.Link
-                href="#about"
-                onClick={(e) => {
-                  scrollToTop();
-                  scrollToFooter(e);
-                }}
-              >
-                About
-              </Nav.Link>
-            </Nav>
+          <div className="hidden items-center gap-1 lg:flex">
+            <ThemeToggle />
+            {!isAuthenticated ? (
+              <>
+                <Button variant="ghost" asChild>
+                  <Link to="/log" onClick={scrollToTop}>
+                    {t('nav.signIn')}
+                  </Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/sign" onClick={scrollToTop}>
+                    {t('nav.signUp')}
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="max-w-48">
+                    <User className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{menuTitle}</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" onClick={scrollToTop}>
+                      {t('nav.profile')}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link to="/settings" onClick={scrollToTop}>
+                      {t('nav.settings')}
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                    {t('nav.logout')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
 
-            <Nav className="ms-lg-auto align-items-lg-center flex-column flex-lg-row py-2 py-lg-0">
-              {!isAuthenticated ? (
-                <>
-                  <Nav.Link
-                    as={Link}
-                    to="/log"
-                    className={location.pathname === '/log' ? 'active' : ''}
-                    style={{ whiteSpace: 'nowrap' }}
-                    onClick={scrollToTop}
-                  >
-                    Sign in
-                  </Nav.Link>
-                  <Nav.Link
-                    as={Link}
-                    to="/sign"
-                    className={location.pathname === '/sign' ? 'active' : ''}
-                    style={{ whiteSpace: 'nowrap' }}
-                    onClick={scrollToTop}
-                  >
-                    Sign up
-                  </Nav.Link>
-                </>
-              ) : (
-                <NavDropdown
-                  title={
-                    <span className="d-inline-flex align-items-center gap-1">
-                      <PersonCircle className="flex-shrink-0" aria-hidden />
-                      <span className="text-truncate" style={{ maxWidth: '12rem' }}>
-                        {menuTitle}
-                      </span>
-                    </span>
-                  }
-                  id="nav-profile-dropdown"
-                  align="end"
-                  menuVariant="dark"
-                  className="w-100 w-lg-auto"
+          <div className="flex items-center lg:hidden">
+            <ThemeToggle />
+            <Button variant="ghost" size="icon" aria-label={t("nav.menu")} onClick={() => setOpen((v) => !v)}>
+              {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </Button>
+          </div>
+        </div>
+
+        {open && (
+          <nav className="flex flex-col gap-1 border-t bg-background p-4 lg:hidden">
+            {LINKS.map((l) => (
+              <Button key={l.to} variant="ghost" asChild className="justify-start">
+                <Link
+                  to={l.to}
+                  onClick={() => {
+                    setOpen(false);
+                    scrollToTop();
+                  }}
                 >
-                  <NavDropdown.Item as={Link} to="/profile" onClick={scrollToTop}>
-                    My profile
-                  </NavDropdown.Item>
-                  <NavDropdown.Item as={Link} to="/settings" onClick={scrollToTop}>
-                    Settings
-                  </NavDropdown.Item>
-                  <NavDropdown.Divider />
-                  <NavDropdown.Item as="button" type="button" className="text-danger" onClick={handleLogout}>
-                    Log out
-                  </NavDropdown.Item>
-                </NavDropdown>
-              )}
-            </Nav>
-          </Navbar.Collapse>
-        </Container>
-      </Navbar>
+                  {t(`nav.${l.key}`)}
+                </Link>
+              </Button>
+            ))}
+            {!isAuthenticated ? (
+              <>
+                <Button variant="ghost" asChild className="justify-start">
+                  <Link to="/log" onClick={() => setOpen(false)}>
+                    {t('nav.signIn')}
+                  </Link>
+                </Button>
+                <Button asChild className="justify-start">
+                  <Link to="/sign" onClick={() => setOpen(false)}>
+                    {t('nav.signUp')}
+                  </Link>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" asChild className="justify-start">
+                  <Link to="/profile" onClick={() => setOpen(false)}>
+                    {t('nav.profile')}
+                  </Link>
+                </Button>
+                <Button variant="ghost" asChild className="justify-start">
+                  <Link to="/settings" onClick={() => setOpen(false)}>
+                    {t('nav.settings')}
+                  </Link>
+                </Button>
+                <Button variant="ghost" className="justify-start text-destructive" onClick={handleLogout}>
+                  {t('nav.logout')}
+                </Button>
+              </>
+            )}
+          </nav>
+        )}
+      </header>
 
-      <div style={{ paddingTop: '70px' }} />
+      <div className="pt-16" />
     </>
   );
 }

@@ -3,7 +3,6 @@ import { useAuth } from '../../context/AuthContext.jsx';
 
 const ROLE_HOME = {
   patient: '/patient-dashboard',
-  clinician: '/clinician-dashboard',
   vendor: '/vendor-dashboard',
 };
 

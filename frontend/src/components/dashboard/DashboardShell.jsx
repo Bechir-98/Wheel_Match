@@ -1,15 +1,14 @@
 import React from 'react';
 import Sidebar from '../Sidebar.jsx';
-import '../../styles/sidebar.css';
 
 /**
- * Shared layout: sidebar + scrollable main (matches patient/clinician/vendor dashboards).
+ * Shared layout: sidebar + scrollable main (matches patient/vendor dashboards).
  */
 export default function DashboardShell({ role, children }) {
   return (
-    <div className="dashboard-wrapper">
+    <div className="flex min-h-[calc(100vh-4rem)]">
       <Sidebar role={role} />
-      <div className="main-content">{children}</div>
+      <div className="min-w-0 flex-1 p-4 md:p-6">{children}</div>
     </div>
   );
 }

@@ -1,27 +1,40 @@
 import React, { useState, useEffect } from "react";
-import { Container, Form, Button, Alert, Card, Row, Col, Spinner } from "react-bootstrap";
-import { 
-  FaUser, 
-  FaEnvelope, 
-  FaLock, 
-  FaBell, 
-  FaSave, 
-  FaPalette,
-  FaLanguage,
-  FaShieldAlt,
-  FaHistory,
-  FaDatabase
-} from "react-icons/fa";
+import { User, Mail, Lock, Bell, Save, Palette, Languages, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert } from "@/components/ui/alert";
 import axios from "axios";
-import "../../styles/DashboardPages.css";
+import { useTheme } from "next-themes";
 import { apiUrl, authHeaders } from "../../config/api.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 import DashboardShell from "../../components/dashboard/DashboardShell.jsx";
+import { setLanguage } from "../../i18n/index.js";
+import { useTranslation } from "react-i18next";
+
+const selectClass = 'flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none disabled:opacity-50';
+
+const Toggle = ({ label, name, checked, onChange }) => (
+  <div className="mb-3 flex items-center gap-2">
+    <input
+      type="checkbox"
+      id={name}
+      name={name}
+      checked={!!checked}
+      onChange={onChange}
+      className="h-4 w-4 rounded border-border"
+    />
+    <Label htmlFor={name}>{label}</Label>
+  </div>
+);
 
 const Settings = () => {
+  const { t } = useTranslation();
+  const { setTheme } = useTheme();
   const { user: authUser } = useAuth();
   const shellRole =
-    authUser?.userType === "patient" || authUser?.userType === "clinician" || authUser?.userType === "vendor"
+    authUser?.userType === "patient" || authUser?.userType === "vendor"
       ? authUser.userType
       : null;
   const wrapLayout = (node) =>
@@ -31,19 +44,19 @@ const Settings = () => {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [formData, setFormData] = useState({
-    // Account Settings
+    // {t("settings.account")}
     email: "",
     currentPassword: "",
     newPassword: "",
     confirmPassword: "",
     
-    // Notification Settings
+    // {t("settings.notifications")}
     NOTIFICATIONS_EMAIL: true,
     NOTIFICATIONS_PUSH: true,
     APPOINTMENT_REMINDERS: true,
     SYSTEM_UPDATES: true,
     
-    // Display Settings
+    // {t("settings.display")}
     THEME: "light",
     LANGUAGE: "en",
     FONT_SIZE: "medium",
@@ -78,6 +91,9 @@ const Settings = () => {
           ...prev,
           ...response.data
         }));
+        // ponytail: backend prefs are the source of truth, applied to live providers here
+        if (response.data.THEME) setTheme(response.data.THEME);
+        if (response.data.LANGUAGE) setLanguage(response.data.LANGUAGE);
       } catch (err) {
         console.error('Error fetching settings:', err);
         setError(`Error loading settings: ${err.message}`);
@@ -117,6 +133,8 @@ const Settings = () => {
       }
       
       setSuccess(true);
+      setTheme(formData.THEME);
+      setLanguage(formData.LANGUAGE);
     } catch (err) {
       console.error('Error saving settings:', err);
       setError(`Error saving settings: ${err.message}`);
@@ -127,285 +145,157 @@ const Settings = () => {
 
   if (loading) {
     return wrapLayout(
-      <Container className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
-        <Spinner animation="border" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </Spinner>
-      </Container>,
+      <div className="mx-auto max-w-6xl px-4 flex justify-center items-center" style={{ minHeight: '60vh' }}>
+        <Loader2 className="h-8 w-8 animate-spin" role="status" />
+      </div>,
     );
   }
 
   return wrapLayout(
-    <Container className="py-4">
-      <h1 className="mb-4">Settings</h1>
+    <div className="mx-auto max-w-6xl px-4 py-4">
+      <h1 className="mb-4 text-2xl font-bold">{t("settings.title")}</h1>
       
       {error && (
-        <Alert variant="danger" onClose={() => setError(null)} dismissible>
+        <Alert variant="destructive" className="mb-4">
           {error}
         </Alert>
       )}
       
       {success && (
-        <Alert variant="success" onClose={() => setSuccess(false)} dismissible>
-          Settings have been successfully updated!
+        <Alert className="mb-4">
+          {t("settings.updated")}
         </Alert>
       )}
 
-      <Form onSubmit={handleSubmit}>
-        <div className="d-flex flex-wrap gap-4">
+      <form onSubmit={handleSubmit}>
+        <div className="flex flex-wrap gap-4">
           {/* Account Settings */}
-          <Card className="flex-grow-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">
-                <FaUser className="me-2" />
+          <Card className="flex-grow-1 flex-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
+            <CardHeader className="bg-muted/50 rounded-t-lg">
+              <CardTitle className="text-lg flex items-center">
+                <User className="mr-2 h-4 w-4" />
                 Account Settings
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  <FaEnvelope className="me-2" />
-                  Email Address
-                </Form.Label>
-                <Form.Control
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="mb-3 flex flex-col gap-2">
+                <Label className="flex items-center">
+                  <Mail className="mr-2 h-4 w-4" />
+                  {t("settings.email")}
+                </Label>
+                <Input
                   type="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
                   required
                 />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  <FaLock className="me-2" />
-                  Current Password
-                </Form.Label>
-                <Form.Control
+              </div>
+              <div className="mb-3 flex flex-col gap-2">
+                <Label className="flex items-center">
+                  <Lock className="mr-2 h-4 w-4" />
+                  {t("settings.currentPassword")}
+                </Label>
+                <Input
                   type="password"
                   name="currentPassword"
                   value={formData.currentPassword}
                   onChange={handleChange}
                 />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>New Password</Form.Label>
-                <Form.Control
+              </div>
+              <div className="mb-3 flex flex-col gap-2">
+                <Label>{t("settings.newPassword")}</Label>
+                <Input
                   type="password"
                   name="newPassword"
                   value={formData.newPassword}
                   onChange={handleChange}
                 />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Confirm Password</Form.Label>
-                <Form.Control
+              </div>
+              <div className="mb-3 flex flex-col gap-2">
+                <Label>{t("settings.confirmPassword")}</Label>
+                <Input
                   type="password"
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}
                 />
-              </Form.Group>
-            </Card.Body>
+              </div>
+            </CardContent>
           </Card>
 
           {/* Notification Settings */}
-          <Card className="flex-grow-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">
-                <FaBell className="me-2" />
+          <Card className="flex-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
+            <CardHeader className="bg-muted/50 rounded-t-lg">
+              <CardTitle className="text-lg flex items-center">
+                <Bell className="mr-2 h-4 w-4" />
                 Notification Settings
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Email Notifications"
-                  name="NOTIFICATIONS_EMAIL"
-                  checked={formData.NOTIFICATIONS_EMAIL}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Push Notifications"
-                  name="NOTIFICATIONS_PUSH"
-                  checked={formData.NOTIFICATIONS_PUSH}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Appointment Reminders"
-                  name="APPOINTMENT_REMINDERS"
-                  checked={formData.APPOINTMENT_REMINDERS}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="System Updates"
-                  name="SYSTEM_UPDATES"
-                  checked={formData.SYSTEM_UPDATES}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-            </Card.Body>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Toggle label={t("settings.emailNotif")} name="NOTIFICATIONS_EMAIL" checked={formData.NOTIFICATIONS_EMAIL} onChange={handleChange} />
+              <Toggle label={t("settings.pushNotif")} name="NOTIFICATIONS_PUSH" checked={formData.NOTIFICATIONS_PUSH} onChange={handleChange} />
+              <Toggle label={t("settings.appointmentRem")} name="APPOINTMENT_REMINDERS" checked={formData.APPOINTMENT_REMINDERS} onChange={handleChange} />
+              <Toggle label={t("settings.systemUpdates")} name="SYSTEM_UPDATES" checked={formData.SYSTEM_UPDATES} onChange={handleChange} />
+            </CardContent>
           </Card>
 
           {/* Display Settings */}
-          <Card className="flex-grow-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">
-                <FaPalette className="me-2" />
+          <Card className="flex-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
+            <CardHeader className="bg-muted/50 rounded-t-lg">
+              <CardTitle className="text-lg flex items-center">
+                <Palette className="mr-2 h-4 w-4" />
                 Display Settings
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  <FaPalette className="me-2" />
-                  Theme
-                </Form.Label>
-                <Form.Select
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="mb-3 flex flex-col gap-2">
+                <Label className="flex items-center">
+                  <Palette className="mr-2 h-4 w-4" />
+                  {t("settings.theme")}
+                </Label>
+                <select
                   name="THEME"
                   value={formData.THEME}
                   onChange={handleChange}
+                  className={selectClass}
                 >
-                  <option value="light">Light</option>
-                  <option value="dark">Dark</option>
-                  <option value="system">System</option>
-                </Form.Select>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>
-                  <FaLanguage className="me-2" />
-                  Language
-                </Form.Label>
-                <Form.Select
+                  <option value="light">{t("settings.light")}</option>
+                  <option value="dark">{t("settings.dark")}</option>
+                  <option value="system">{t("settings.system")}</option>
+                </select>
+              </div>
+              <div className="mb-3 flex flex-col gap-2">
+                <Label className="flex items-center">
+                  <Languages className="mr-2 h-4 w-4" />
+                  {t("settings.language")}
+                </Label>
+                <select
                   name="LANGUAGE"
                   value={formData.LANGUAGE}
                   onChange={handleChange}
+                  className={selectClass}
                 >
-                  <option value="en">English</option>
-                  <option value="fr">French</option>
-                </Form.Select>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Font Size</Form.Label>
-                <Form.Select
-                  name="FONT_SIZE"
-                  value={formData.FONT_SIZE}
-                  onChange={handleChange}
-                >
-                  <option value="small">Small</option>
-                  <option value="medium">Medium</option>
-                  <option value="large">Large</option>
-                </Form.Select>
-              </Form.Group>
-            </Card.Body>
-          </Card>
-
-          {/* Privacy Settings */}
-          <Card className="flex-grow-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">
-                <FaShieldAlt className="me-2" />
-                Privacy Settings
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Share Anonymous Data"
-                  name="DATA_SHARING"
-                  checked={formData.DATA_SHARING}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Activity Tracking"
-                  name="ACTIVITY_TRACKING"
-                  checked={formData.ACTIVITY_TRACKING}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Show Online Status"
-                  name="ONLINE_STATUS"
-                  checked={formData.ONLINE_STATUS}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-            </Card.Body>
-          </Card>
-
-          {/* System Settings */}
-          <Card className="flex-grow-1" style={{ minWidth: '300px', maxWidth: '500px' }}>
-            <Card.Header className="bg-light">
-              <h5 className="mb-0">
-                <FaDatabase className="me-2" />
-                System Settings
-              </h5>
-            </Card.Header>
-            <Card.Body>
-              <Form.Group className="mb-3">
-                <Form.Check
-                  type="switch"
-                  label="Auto Backup"
-                  name="AUTO_BACKUP"
-                  checked={formData.AUTO_BACKUP}
-                  onChange={handleChange}
-                />
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Backup Frequency</Form.Label>
-                <Form.Select
-                  name="BACKUP_FREQUENCY"
-                  value={formData.BACKUP_FREQUENCY}
-                  onChange={handleChange}
-                >
-                  <option value="daily">Daily</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="monthly">Monthly</option>
-                </Form.Select>
-              </Form.Group>
-              <Form.Group className="mb-3">
-                <Form.Label>Data Retention (days)</Form.Label>
-                <Form.Control
-                  type="number"
-                  name="DATA_RETENTION"
-                  value={formData.DATA_RETENTION}
-                  onChange={handleChange}
-                  min="1"
-                  max="365"
-                />
-              </Form.Group>
-            </Card.Body>
+                  <option value="en">{t("settings.english")}</option>
+                  <option value="fr">{t("settings.french")}</option>
+                </select>
+              </div>
+            </CardContent>
           </Card>
         </div>
 
-        <div className="d-flex justify-content-end mt-4">
+        <div className="flex justify-end mt-4">
           <Button
-            variant="primary"
             type="submit"
             disabled={saving}
-            className="d-flex align-items-center gap-2"
+            className="flex items-center gap-2"
           >
-            <FaSave />
-            {saving ? "Saving..." : "Save"}
+            <Save className="h-4 w-4" />
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
-      </Form>
-    </Container>,
+      </form>
+    </div>,
   );
 };
 

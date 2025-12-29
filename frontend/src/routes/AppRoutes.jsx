@@ -3,15 +3,14 @@ import Home from '../pages/home.jsx';
 import Sign from '../pages/sign.jsx';
 import Log from '../pages/log.jsx';
 import Navb from '../layouts/nav.jsx';
-import FAQ from '../pages/faq.jsx';
+import FAQ from '../pages/Faq.jsx';
+import About from '../pages/About.jsx';
 
-import ClinicianDashboard from '../pages/Dashboard_clinicien.jsx';
 import VendorDashboard from '../pages/VendorDashboard.jsx';
 import PatientDashboard from '../pages/Patient_Dashboard.jsx';
 
 import WheelchairDetails from '../pages/WheelchairsPage.jsx';
 import WheelchairDetail from '../components/WheelchairDetail';
-import PatientsPage from '../pages/patients.jsx';
 
 import MyProfile from '../pages/dashboard/MyProfile.jsx';
 import Messages from '../pages/dashboard/Messages.jsx';
@@ -53,15 +52,6 @@ function RouteR() {
             />
 
             <Route
-              path="/patients"
-              element={
-                <ProtectedRoute>
-                  <PatientsPage />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
               path="/patient-dashboard"
               element={
                 <ProtectedRoute>
@@ -77,15 +67,6 @@ function RouteR() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="/clinician-dashboard"
-              element={
-                <ProtectedRoute>
-                  <ClinicianDashboard />
-                </ProtectedRoute>
-              }
-            />
-
             <Route
               path="/profile"
               element={
@@ -136,6 +117,7 @@ function RouteR() {
             />
 
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/about" element={<About />} />
           </Routes>
         </div>
       </AuthProvider>
