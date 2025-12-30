@@ -371,7 +371,16 @@
     "morphRecorded": "Morphology recorded: {{v}}",
     "backDash": "Back to dashboard",
     "browse": "Browse wheelchairs",
-    "loadingAria": "Loading"
+    "loadingAria": "Loading",
+    "editTitle": "My medical info",
+    "selectMorphology": "Select morphology",
+    "selectPathology": "Select pathology",
+    "save": "Save",
+    "saved": "Medical info saved.",
+    "scanLabel": "Or scan a medical report (PDF or photo)",
+    "scanHint": "Values pre-fill the form below — review and save to confirm. The file is not stored.",
+    "scanning": "Reading report…",
+    "scanReview": "Found: {{path}} / {{morph}} (confidence {{conf}}%). Review and save."
   },
   "catalog": {
     "title": "Wheelchair Catalog",

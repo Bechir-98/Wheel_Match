@@ -1,5 +1,6 @@
 """Patient-facing endpoints (authenticated patient only)."""
 
+import unicodedata
 from datetime import date
 from typing import Any
 
@@ -39,6 +40,11 @@ def _record_author_name(db: Session, author_user_id: int) -> str:
     if u and u.EMAIL:
         return u.EMAIL.split("@")[0]
     return "—"
+
+
+def _norm(s: str) -> str:
+    # ponytail: accent/case-insensitive match (Paraplégie == Paraplegie)
+    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").casefold().strip()
 
 
 @router.get("/dashboard")
@@ -135,9 +141,16 @@ def save_my_medical(
     patho = (body.pathologie or "").strip()
     if not morph or not patho:
         raise HTTPException(status_code=422, detail="Morphology and pathology are required")
-    if not db.query(Morphologie).filter(Morphologie.NOM_ORG == morph).first():
+    # ponytail: accent/case-insensitive match, canonical value stored
+    morph_row = next(
+        (m for m in db.query(Morphologie).all() if _norm(m.NOM_ORG or "") == _norm(morph)), None
+    )
+    if not morph_row:
         raise HTTPException(status_code=422, detail="Unknown morphology")
-    if not db.query(Pathologie).filter(Pathologie.NOM_PAT == patho).first():
+    path_row = next(
+        (p for p in db.query(Pathologie).all() if _norm(p.NOM_PAT or "") == _norm(patho)), None
+    )
+    if not path_row:
         raise HTTPException(status_code=422, detail="Unknown pathology")
     source = (body.source or "self").strip() or "self"
     if source not in ("self", "pdf"):
@@ -147,8 +160,8 @@ def save_my_medical(
     if not rec:
         rec = PatientMedical(PAT_ID_UTILISATUER=user.ID_UTILISATUER)
         db.add(rec)
-    rec.MORPHOLOGIE = morph
-    rec.PATHOLOGIE = patho
+    rec.MORPHOLOGIE = morph_row.NOM_ORG
+    rec.PATHOLOGIE = path_row.NOM_PAT
     rec.NOTES = (body.notes or "").strip() or None
     rec.SOURCE = source
     db.commit()
@@ -168,17 +181,20 @@ async def scan_medical_pdf(
     db: Session = Depends(get_db),
     user: Utilisateur = Depends(require_patient),
 ):
-    """Extract reference values from an uploaded report. Read-only: nothing is saved."""
-    from app.services.docscan_service import MAX_BYTES, extract_text, map_to_reference
+    """Extract reference values from an uploaded report or photo. Read-only: nothing is saved."""
+    from app.services.docscan_service import MAX_BYTES, extract_text, map_to_reference, ocr_image
 
     name = (file.filename or "").lower()
-    if not name.endswith(".pdf") or "pdf" not in (file.content_type or ""):
-        raise HTTPException(status_code=422, detail="Only PDF files allowed")
+    ctype = (file.content_type or "").lower()
+    is_pdf = name.endswith(".pdf") and "pdf" in ctype
+    is_image = name.endswith((".jpg", ".jpeg", ".png", ".webp")) and ctype.startswith("image/")
+    if not (is_pdf or is_image):
+        raise HTTPException(status_code=422, detail="Only PDF or image files (JPG/PNG/WebP) allowed")
     raw = await file.read()
     if not raw or len(raw) > MAX_BYTES:
-        raise HTTPException(status_code=422, detail="PDF must be non-empty and under 5MB")
+        raise HTTPException(status_code=422, detail="File must be non-empty and under 5MB")
     try:
-        text, method = extract_text(raw)
+        text, method = ocr_image(raw) if is_image else extract_text(raw)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     try:

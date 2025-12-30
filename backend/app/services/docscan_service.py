@@ -5,6 +5,8 @@ Nothing is saved here; the caller pre-fills the self-entry form for confirmation
 
 import io
 import json
+import re
+import unicodedata
 import urllib.request
 
 from sqlalchemy.orm import Session
@@ -15,6 +17,14 @@ from app.models import Morphologie, Pathologie
 MAX_BYTES = 5 * 1024 * 1024
 MAX_PAGES = 10
 MIN_TEXT_CHARS = 200
+
+# ponytail: small models wrap JSON in fences despite json_object mode; strip once
+_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.DOTALL)
+
+
+def _norm(s: str) -> str:
+    # ponytail: accent/case-insensitive match (Paraplégie == Paraplegie)
+    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").casefold().strip()
 
 
 def extract_text(pdf_bytes: bytes) -> tuple[str, str]:
@@ -41,6 +51,25 @@ def extract_text(pdf_bytes: bytes) -> tuple[str, str]:
         raise ValueError(f"OCR failed: {e}")
     if len(ocr) < MIN_TEXT_CHARS:
         raise ValueError("No readable text found in PDF")
+    return ocr, "ocr"
+
+
+def ocr_image(image_bytes: bytes) -> tuple[str, str]:
+    """Direct OCR for uploaded photos/scans. Raises ValueError when unreadable."""
+    from PIL import Image
+    import pytesseract
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img.load()
+    except Exception:
+        raise ValueError("Unreadable image")
+    try:
+        ocr = pytesseract.image_to_string(img, lang="fra+eng").strip()
+    except Exception as e:
+        raise ValueError(f"OCR failed: {e}")
+    if len(ocr) < MIN_TEXT_CHARS:
+        raise ValueError("No readable text found in image")
     return ocr, "ocr"
 
 
@@ -81,24 +110,32 @@ def map_to_reference(db: Session, text: str) -> dict:
         )
         with urllib.request.urlopen(req, timeout=60) as res:
             outer = json.loads(res.read().decode())
-        parsed = json.loads(outer["choices"][0]["message"]["content"])
+        parsed = json.loads(_FENCE_RE.sub("", outer["choices"][0]["message"]["content"].strip()))
     except Exception as e:
         raise ValueError(f"SLM mapping failed: {e}")
 
     pathology = (parsed.get("pathology") or "").strip() or None
     morphology = (parsed.get("morphology") or "").strip() or None
     # ponytail: trust the reference tables, not the model — drop anything off-list
-    if pathology and pathology not in pathologies:
-        pathology = None
-    if morphology and morphology not in morphologies:
-        morphology = None
+    path_by_norm = {_norm(p): p for p in pathologies}
+    morph_by_norm = {_norm(m): m for m in morphologies}
+    pathology = path_by_norm.get(_norm(pathology or ""))
+    morphology = morph_by_norm.get(_norm(morphology or ""))
     try:
         confidence = float(parsed.get("confidence") or 0)
     except (TypeError, ValueError):
         confidence = 0
+    # ponytail: values must be grounded in the report text, else the model guessed
+    text_norm = _norm(text)
+    if pathology and _norm(pathology) not in text_norm:
+        pathology, confidence = None, min(confidence, 0.3)
+    if morphology and _norm(morphology) not in text_norm:
+        morphology, confidence = None, min(confidence, 0.3)
+    confidence = max(0.0, min(1.0, confidence))
+    print(f"SCAN mapped (pathology={pathology}, morphology={morphology}, confidence={confidence})")
     return {
         "pathology": pathology,
         "morphology": morphology,
-        "confidence": max(0.0, min(1.0, confidence)),
+        "confidence": confidence,
         "evidence": (parsed.get("evidence") or "").strip()[:500],
     }
