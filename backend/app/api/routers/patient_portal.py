@@ -3,7 +3,8 @@
 from datetime import date
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_patient
@@ -11,6 +12,7 @@ from app.models import (
     Consultation,
     EstAssocie,
     Fauteuil,
+    Morphologie,
     Pathologie,
     PatientMedical,
     Utilisateur,
@@ -22,6 +24,13 @@ from app.services.messaging import unread_count
 from fastapi import HTTPException, status
 
 router = APIRouter()
+
+
+class MedicalPayload(BaseModel):
+    morphologie: str
+    pathologie: str
+    notes: str | None = None
+    source: str = "self"
 
 
 def _record_author_name(db: Session, author_user_id: int) -> str:
@@ -114,6 +123,70 @@ def patient_dashboard(
         "consultations": consultations_out,
         "medical": medical_out,
     }
+
+@router.put("/medical")
+def save_my_medical(
+    body: MedicalPayload,
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_patient),
+):
+    """Self-reported snapshot; coded values must match reference tables exactly."""
+    morph = (body.morphologie or "").strip()
+    patho = (body.pathologie or "").strip()
+    if not morph or not patho:
+        raise HTTPException(status_code=422, detail="Morphology and pathology are required")
+    if not db.query(Morphologie).filter(Morphologie.NOM_ORG == morph).first():
+        raise HTTPException(status_code=422, detail="Unknown morphology")
+    if not db.query(Pathologie).filter(Pathologie.NOM_PAT == patho).first():
+        raise HTTPException(status_code=422, detail="Unknown pathology")
+    source = (body.source or "self").strip() or "self"
+    if source not in ("self", "pdf"):
+        source = "self"
+
+    rec = db.query(PatientMedical).filter(PatientMedical.PAT_ID_UTILISATUER == user.ID_UTILISATUER).first()
+    if not rec:
+        rec = PatientMedical(PAT_ID_UTILISATUER=user.ID_UTILISATUER)
+        db.add(rec)
+    rec.MORPHOLOGIE = morph
+    rec.PATHOLOGIE = patho
+    rec.NOTES = (body.notes or "").strip() or None
+    rec.SOURCE = source
+    db.commit()
+    db.refresh(rec)
+    return {
+        "MORPHOLOGIE": rec.MORPHOLOGIE or "",
+        "PATHOLOGIE": rec.PATHOLOGIE or "",
+        "NOTES": rec.NOTES or "",
+        "SOURCE": rec.SOURCE or "self",
+        "UPDATED_AT": rec.UPDATED_AT.isoformat() if rec.UPDATED_AT else None,
+    }
+
+
+@router.post("/medical/scan")
+async def scan_medical_pdf(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_patient),
+):
+    """Extract reference values from an uploaded report. Read-only: nothing is saved."""
+    from app.services.docscan_service import MAX_BYTES, extract_text, map_to_reference
+
+    name = (file.filename or "").lower()
+    if not name.endswith(".pdf") or "pdf" not in (file.content_type or ""):
+        raise HTTPException(status_code=422, detail="Only PDF files allowed")
+    raw = await file.read()
+    if not raw or len(raw) > MAX_BYTES:
+        raise HTTPException(status_code=422, detail="PDF must be non-empty and under 5MB")
+    try:
+        text, method = extract_text(raw)
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    try:
+        mapped = map_to_reference(db, text)
+    except ValueError as e:
+        raise HTTPException(status_code=502, detail=str(e))
+    return {"method": method, **mapped}
+
 
 @router.post("/requests", response_model=DemandeOut)
 def create_request(

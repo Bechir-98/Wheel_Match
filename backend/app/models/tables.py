@@ -159,6 +159,8 @@ class PatientMedical(Base):
     MORPHOLOGIE = Column(String(255), nullable=True)
     PATHOLOGIE = Column(String(255), nullable=True)
     NOTES = Column(Text, nullable=True)
+    # ponytail: origin of the snapshot (clinician legacy, self form, pdf scan)
+    SOURCE = Column(String(16), nullable=False, default="clinician")
     UPDATED_AT = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class DemandeFauteuil(Base):
