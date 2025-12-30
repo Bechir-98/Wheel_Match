@@ -37,9 +37,6 @@ function Sign() {
   const navigate = useNavigate();
   const { refreshSession } = useAuth();
 
-  // Log to check if this component is mounted
-  console.log('Sign Component Rendered');
-
   // Handle input changes
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -85,7 +82,6 @@ function Sign() {
     }
 
     try {
-      console.log('Form data:', formData);
       const { confirmPassword: _c, ...registerPayload } = formData;
       const response = await fetch(apiUrl('/auth/register'), {
         method: 'POST',
@@ -141,7 +137,6 @@ function Sign() {
         setError(data.error || t('auth.registrationFailed'));
       }
     } catch (err) {
-      console.error('Error details:', err);
       setError(t('auth.errorGeneric', { message: err.message }));
     }
   };

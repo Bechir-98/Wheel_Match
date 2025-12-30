@@ -81,8 +81,6 @@ const Settings = () => {
         const response = await axios.get(apiUrl('/users/me/settings'), {
           headers: authHeaders(),
         });
-        console.log('Settings response:', response.data);
-        
         if (response.data.error) {
           throw new Error(response.data.error);
         }
@@ -95,7 +93,6 @@ const Settings = () => {
         if (response.data.THEME) setTheme(response.data.THEME);
         if (response.data.LANGUAGE) setLanguage(response.data.LANGUAGE);
       } catch (err) {
-        console.error('Error fetching settings:', err);
         setError(`Error loading settings: ${err.message}`);
       } finally {
         setLoading(false);
@@ -126,8 +123,6 @@ const Settings = () => {
       const response = await axios.put(apiUrl('/users/me/settings'), formData, {
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
       });
-      console.log('Save response:', response.data);
-      
       if (response.data.error) {
         throw new Error(response.data.error);
       }
@@ -136,7 +131,6 @@ const Settings = () => {
       setTheme(formData.THEME);
       setLanguage(formData.LANGUAGE);
     } catch (err) {
-      console.error('Error saving settings:', err);
       setError(`Error saving settings: ${err.message}`);
     } finally {
       setSaving(false);

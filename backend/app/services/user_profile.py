@@ -5,23 +5,6 @@ from sqlalchemy.orm import Session
 from app.models import Comercant, Patient, Utilisateur
 
 
-def build_display_name(db: Session, user: Utilisateur, role: str) -> str:
-    """Human-readable label for nav / greetings (falls back to email local-part)."""
-    if role == "patient":
-        p = db.query(Patient).filter(Patient.ID_UTILISATUER == user.ID_UTILISATUER).first()
-        if p:
-            parts = [str(p.PRENOMP or "").strip(), str(p.NOMP or "").strip()]
-            name = " ".join(x for x in parts if x).strip()
-            if name:
-                return name
-    elif role == "vendor":
-        v = db.query(Comercant).filter(Comercant.ID_UTILISATUER == user.ID_UTILISATUER).first()
-        if v and (v.NOM_COMMERCIAL or "").strip():
-            return (v.NOM_COMMERCIAL or "").strip()
-    email = (user.EMAIL or "").strip()
-    return email.split("@")[0] if email else "User"
-
-
 def build_profile_payload(db: Session, user: Utilisateur, role: str) -> dict:
     base = {
         "id_utilisateur": user.ID_UTILISATUER,

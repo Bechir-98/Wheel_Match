@@ -40,8 +40,7 @@ Wheel Match is a role-based healthcare mobility platform that helps patients fin
 ### Frontend
 - **React 18** + **Vite**
 - **React Router DOM** — client-side routing
-- **Bootstrap 5** + **React Bootstrap** — responsive UI
-- **Ant Design** — data tables and form controls
+- **Tailwind CSS** + **Radix UI** (`src/components/ui`) — responsive UI
 - **Framer Motion** — animations
 - **Axios** — HTTP client
 
@@ -62,82 +61,74 @@ Wheel_Match/
 ├── backend/
 │   ├── app/
 │   │   ├── api/
+│   │   │   ├── deps.py             # Auth dependencies (get_current_user, role guards)
 │   │   │   └── routers/
 │   │   │       ├── auth.py           # Login / Register
-│   │   │       ├── users.py         # Current user profile
-│   │   │       ├── patients.py      # Patient CRUD + medical data
-│   │   │       ├── patient_portal.py # Patient dashboard & requests
-│   │   │       ├── clinician_portal.py # Clinician dashboard & approvals
-│   │   │       ├── vendor_portal.py  # Vendor dashboard
-│   │   │       ├── wheelchairs.py    # Catalog browsing
-│   │   │       └── reference.py     # Morphologies, pathologies, components, options
+│   │   │       ├── users.py          # Current user profile + settings
+│   │   │       ├── patient_portal.py # Patient dashboard, medical, requests
+│   │   │       ├── recommendations.py# Rule-first ranking + SLM re-rank
+│   │   │       ├── vendor_portal.py  # Vendor dashboard + requests
+│   │   │       ├── wheelchairs.py    # Catalog CRUD + image upload
+│   │   │       ├── reference.py      # Types, morphologies, pathologies, components, options
+│   │   │       ├── chat.py           # Chat + rebuild-kb
+│   │   │       └── messages.py       # Threads + unread-count
 │   │   ├── core/
 │   │   │   └── config.py            # Settings, JWT, CORS
 │   │   ├── db/
 │   │   │   └── session.py           # SQLAlchemy session factory
 │   │   ├── models/
 │   │   │   └── tables.py            # All database models
-│   │   ├── schemas/
-│   │   ├── services/
-│   │   │   ├── auth_service.py      # Password hashing, JWT, role resolution
-│   │   │   └── user_profile.py      # Profile helpers
-│   │   ├── api/
-│   │   │   └── deps.py             # Auth dependencies (get_current_user, role guards)
-│   │   └── main.py                 # FastAPI app entry
-│   ├── scripts/
+│   │   ├── schemas/                 # auth, chat, demandes, messages
+│   │   ├── services/                # auth_service, chat_service, docscan_service,
+│   │   │                           # kb_builder, messaging, recommend_service, user_profile
+│   │   └── main.py                  # FastAPI app entry
+│   ├── scripts/                     # schema_postgresql, drop_clinician, eval_recommend
+│   ├── uploads/                     # Runtime images (gitignored, .gitkeep)
 │   └── requirements.txt
 │
 └── frontend/
     ├── src/
     │   ├── components/
-    │   │   ├── auth/
-    │   │   │   ├── ProtectedRoute.jsx
-    │   │   │   └── GuestRoute.jsx
-    │   │   ├── DashboardShell.jsx
+    │   │   ├── auth/                # ProtectedRoute, GuestRoute
+    │   │   ├── chat/                # ChatWidget, ChatInput, ChatMessage, ChatContext
+    │   │   ├── dashboard/           # DashboardShell
+    │   │   ├── ui/                  # alert, avatar, badge, button, card, dialog,
+    │   │   │                       # dropdown-menu, input, label, select, separator,
+    │   │   │                       # skeleton, table, textarea
+    │   │   ├── MedicalRecordForm.jsx
     │   │   ├── Sidebar.jsx
-    │   │   ├── Button.jsx
-    │   │   ├── Card.jsx
-    │   │   ├── Input.jsx
-    │   │   ├── NavBar.jsx
-    │   │   ├── Footer.jsx
-    │   │   └── WheelchairDetail.jsx
+    │   │   └── theme-toggle.jsx
     │   ├── context/
     │   │   └── AuthContext.jsx
-    │   ├── contexts/
-    │   │   ├── CartContext.jsx
-    │   │   └── ToastContext.jsx
-    │   ├── hooks/
-    │   │   ├── useWheelchairs.js
-    │   │   ├── useAuth.js
-    │   │   └── use-toast.js
     │   ├── pages/
-    │   │   ├── home.jsx            # Landing page
-    │   │   ├── sign.jsx            # Registration
-    │   │   ├── log.jsx             # Login
-    │   │   ├── faq.jsx             # FAQ
+    │   │   ├── home.jsx             # Landing page
+    │   │   ├── About.jsx
+    │   │   ├── Faq.jsx
+    │   │   ├── sign.jsx             # Registration (patient / vendor)
+    │   │   ├── log.jsx              # Login
     │   │   ├── WheelchairsPage.jsx  # Catalog
-    │   │   ├── patients.jsx        # Clinician patient management
+    │   │   ├── WheelchairDetailPage.jsx
     │   │   ├── Patient_Dashboard.jsx
-    │   │   ├── Dashboard_clinicien.jsx
     │   │   ├── VendorDashboard.jsx
-    │   │   ├── record.jsx          # Medical records
-    │   │   ├── products.jsx       # Vendor inventory
-    │   │   └── choisis.jsx        # Wheelchair selection
+    │   │   ├── products.jsx         # Vendor inventory
+    │   │   ├── choisis.jsx          # Wheelchair selection
     │   │   └── dashboard/
     │   │       ├── MyProfile.jsx
     │   │       ├── Messages.jsx
     │   │       └── Settings.jsx
+    │   ├── layouts/
+    │   │   ├── nav.jsx
+    │   │   └── footer.jsx
     │   ├── routes/
-    │   │   └── AppRoutes.jsx       # All app routes
-    │   ├── services/
-    │   │   └── api.ts              # Axios client
+    │   │   └── AppRoutes.jsx        # All app routes
     │   ├── config/
-    │   │   └── api.js
-    │   ├── data/
-    │   │   └── wheelchairs.jsx     # Mock data
+    │   │   └── api.js               # apiUrl / authHeaders (single client)
+    │   ├── lib/
+    │   │   └── utils.js             # cn()
     │   ├── styles/
-    │   │   └── theme.js            # Design tokens
-    │   └── App.jsx
+    │   │   └── index.css
+    │   ├── App.jsx
+    │   └── main.jsx
     └── package.json
 ```
 
@@ -147,7 +138,7 @@ Wheel_Match/
 
 ### Authentication & Authorization
 - JWT-based login with 7-day token expiration
-- Multi-role registration (Patient, Clinician, Vendor)
+- Registration (Patient, Vendor)
 - Role-based route guards and redirects
 - Automatic legacy password upgrade on login
 - Cross-tab session sync via localStorage events
@@ -155,17 +146,10 @@ Wheel_Match/
 ### Patient Portal
 - Registration with medical details (NSS, weight, height, propulsion type)
 - Dashboard with profile completion tracking
-- Medical records view (morphology, pathology, clinician notes)
-- Consultation history
+- Medical records view (morphology, pathology, history)
+- AI-ranked recommendations (`GET /patient/recommendations`), patient choice is final (`APPROUVE`)
 - Wheelchair request submission with status tracking (Pending / Approved / Rejected)
 - Catalog browsing and wheelchair details
-
-### Clinician Portal
-- Patient registry with CRUD operations
-- Medical data entry for patients (morphology, pathology, notes)
-- Consultation recording
-- Dashboard with stats (patients seen, consultations today/month, pending assessments)
-- Wheelchair request review — approve or reject with clinician notes
 
 ### Vendor Portal
 - Inventory management dashboard
@@ -196,7 +180,7 @@ Wheel_Match/
 ### Auth
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/v1/auth/register` | Register (patient / clinician / vendor) |
+| POST | `/api/v1/auth/register` | Register (patient / vendor) |
 | POST | `/api/v1/auth/login` | Login, returns JWT + redirect path |
 
 ### Users
@@ -207,48 +191,52 @@ Wheel_Match/
 | GET | `/api/v1/users/me/settings` | User preferences |
 | PUT | `/api/v1/users/me/settings` | Update preferences |
 
-### Patients
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/patients` | List patients (clinician only) |
-| POST | `/api/v1/patients` | Create patient |
-| PUT | `/api/v1/patients/{id}` | Update patient |
-| DELETE | `/api/v1/patients/{id}` | Delete patient |
-| POST | `/api/v1/patients/{id}/medical` | Save medical data |
-
 ### Patient Portal
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/v1/patient/dashboard` | Dashboard data |
+| PUT | `/api/v1/patient/medical` | Update medical data |
+| POST | `/api/v1/patient/medical/scan` | Scan medical document |
 | POST | `/api/v1/patient/requests` | Submit wheelchair request |
 | GET | `/api/v1/patient/requests` | List patient requests |
-
-### Clinician Portal
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/api/v1/clinician/dashboard` | Dashboard with stats |
-| GET | `/api/v1/clinician/requests` | All patient requests |
-| PUT | `/api/v1/clinician/requests/{id}/status` | Approve/reject request |
+| POST | `/api/v1/patient/requests/{id}/accept` | Accept ranking choice (final) |
+| GET | `/api/v1/patient/recommendations` | Rule-first ranking + SLM re-rank |
 
 ### Vendor Portal
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/v1/vendor/dashboard` | Dashboard with inventory stats |
+| GET | `/api/v1/vendor/requests` | Incoming patient requests |
 
 ### Wheelchairs
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/v1/wheelchairs` | List with filters |
+| POST | `/api/v1/wheelchairs` | Create product (vendor) |
 | GET | `/api/v1/wheelchairs/{id}` | Product detail |
-| GET | `/api/v1/wheelchairs/related/list` | Related products |
+| PUT | `/api/v1/wheelchairs/{id}` | Update product (vendor) |
+| DELETE | `/api/v1/wheelchairs/{id}` | Delete product (vendor) |
+| POST | `/api/v1/wheelchairs/{id}/image` | Upload product image |
 
 ### Reference Data
 | Method | Endpoint | Description |
 |--------|----------|-------------|
+| GET | `/api/v1/reference/types` | All wheelchair types |
 | GET | `/api/v1/reference/morphologies` | All morphology types |
 | GET | `/api/v1/reference/pathologies` | All pathologies |
 | GET | `/api/v1/reference/components` | All components |
 | GET | `/api/v1/reference/options` | All options |
+
+### Chat & Messages
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/v1/chat` | Chat query |
+| POST | `/api/v1/chat/rebuild-kb` | Re-embed knowledge base |
+| GET | `/api/v1/chat/health` | Chat service health |
+| GET | `/api/v1/messages/threads` | List threads |
+| GET | `/api/v1/messages/threads/{id}` | Thread messages |
+| POST | `/api/v1/messages/messages` | Send message |
+| GET | `/api/v1/messages/unread-count` | Unread count |
 
 ---
 
@@ -256,7 +244,6 @@ Wheel_Match/
 
 - **Utilisateur** — base user (email, password, address, phone)
 - **Patient** — name, NSS, weight, height, propulsion type, caregiver flag
-- **Clinicien** — name, specialty (rehabilitation / orthopedics / neurology)
 - **Comercant** — commercial name
 - **Fauteuil** — wheelchair product (type, propulsion, price, stock)
 - **TypeFauteuil** — wheelchair type definitions
@@ -266,8 +253,11 @@ Wheel_Match/
 - **Option** — wheelchair options/accessories
 - **Consultation** — patient-clinician consultation records
 - **DemandeFauteuil** — wheelchair requests with status (EN_ATTENTE / APPROUVE / REJETE)
-- **PatientMedical** — clinician-entered medical records
+- **PatientMedical** — patient medical records
 - **UserPreferences** — user settings
+
+> Clinician tables (`CLINICIEN`, `CLINICIAN_PATIENT`, `LINK_REQUEST`) are dropped by
+> `backend/scripts/drop_clinician.sql`. History tables (`Consultation`, `MedicalEntry`) are kept.
 
 ---
 
@@ -319,13 +309,11 @@ npm run dev
 | `/sign` | Register | Guest only |
 | `/log` | Login | Guest only |
 | `/faq` | FAQ | Public |
-| `/patients` | Patients | Clinician |
-| `/patient-dashboard` | Patient Dashboard | Patient |
-| `/clinician-dashboard` | Clinician Dashboard | Clinician |
-| `/vendor-dashboard` | Vendor Dashboard | Vendor |
+| `/about` | About | Public |
+| `/patient-dashboard` | Patient Dashboard | Authenticated |
+| `/vendor-dashboard` | Vendor Dashboard | Authenticated |
 | `/profile` | My Profile | Authenticated |
 | `/settings` | Settings | Authenticated |
 | `/messages` | Messages | Authenticated |
-| `/record` | Medical Records | Patient |
-| `/products` | Inventory | Vendor |
+| `/products` | Inventory | Authenticated |
 | `/choisis` | Wheelchair Selection | Authenticated |

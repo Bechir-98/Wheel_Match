@@ -11,7 +11,7 @@ class DemandeOut(BaseModel):
     ID_PATIENT: int
     ID_FAUTEUIL: int
     STATUT: str
-    NOTES_CLINICIEN: Optional[str] = None
+    NOTES: Optional[str] = None
     ORIGIN: str = "slm"
     PATIENT_ACCEPT: Optional[bool] = None
     DATE_DEMANDE: Optional[datetime] = None

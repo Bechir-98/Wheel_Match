@@ -84,8 +84,6 @@ def vendor_dashboard(
                 Fauteuil.ID_UTILISATUER == uid,
                 DemandeFauteuil.STATUT == "EN_ATTENTE",
             ).count(),
-            "monthly_revenue": None,
-            "average_rating": None,
             "messages_unread": unread_count(db, user.ID_UTILISATUER),
         },
         "recent_products": recent_products,

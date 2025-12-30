@@ -9,7 +9,6 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_vendor
-from app.db.session import get_db
 from app.models import (
     AvoirOption,
     ComposerDe,
@@ -66,21 +65,6 @@ def _row_to_list_item(row, nom_type: str) -> dict:
         "PROPULTION_TEXT": "With propulsion" if row.PROPULTION else "Manual",
     }
     return d
-
-
-@router.get("/related/list")
-def related_wheelchairs(
-    db: Session = Depends(get_db),
-    type_id: int = Query(..., alias="type"),
-    exclude_id: int = Query(..., alias="exclude"),
-):
-    q = (
-        db.query(Fauteuil, TypeFauteuil.NOM_TYPE)
-        .join(TypeFauteuil, Fauteuil.ID_TYPE == TypeFauteuil.ID_TYPE)
-        .filter(Fauteuil.ID_TYPE == type_id, Fauteuil.ID_FAUTEUIL != exclude_id)
-        .limit(4)
-    )
-    return [_row_to_list_item(f, nom_type) for f, nom_type in q.all()]
 
 
 @router.get("")

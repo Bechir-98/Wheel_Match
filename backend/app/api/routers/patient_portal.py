@@ -1,6 +1,5 @@
 """Patient-facing endpoints (authenticated patient only)."""
 
-import unicodedata
 from datetime import date
 from typing import Any
 
@@ -21,7 +20,8 @@ from app.models import (
     TypeFauteuil,
 )
 from app.schemas.demandes import DemandeCreate, DemandeOut
-from app.services.messaging import unread_count
+from app.services.messaging import display_name, unread_count
+from app.services.docscan_service import _norm
 from fastapi import HTTPException, status
 
 router = APIRouter()
@@ -32,19 +32,6 @@ class MedicalPayload(BaseModel):
     pathologie: str
     notes: str | None = None
     source: str = "self"
-
-
-def _record_author_name(db: Session, author_user_id: int) -> str:
-    """Historical consultations predate the SLM; resolve author to email prefix."""
-    u = db.query(Utilisateur).filter(Utilisateur.ID_UTILISATUER == author_user_id).first()
-    if u and u.EMAIL:
-        return u.EMAIL.split("@")[0]
-    return "—"
-
-
-def _norm(s: str) -> str:
-    # ponytail: accent/case-insensitive match (Paraplégie == Paraplegie)
-    return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").casefold().strip()
 
 
 @router.get("/dashboard")
@@ -72,7 +59,7 @@ def patient_dashboard(
                 "date_consultation": d.isoformat() if d else None,
                 "pathology_name": (patho.NOM_PAT or "").strip() or "—",
                 "morphology": (c.NOM_ORG or "").strip() or "—",
-                "clinician_name": _record_author_name(db, c.ID_UTILISATUER),
+                "author_name": display_name(db, c.ID_UTILISATUER),
                 "is_upcoming": bool(d and d >= today),
             }
         )
@@ -257,7 +244,7 @@ def get_patient_requests(
             "ID_FAUTEUIL": d.ID_FAUTEUIL,
             "NOM_TYPE": nom_type,
             "STATUT": d.STATUT,
-            "NOTES_CLINICIEN": d.NOTES_CLINICIEN,
+            "NOTES": d.NOTES,
             "ORIGIN": d.ORIGIN or "patient",
             "PATIENT_ACCEPT": d.PATIENT_ACCEPT,
             "DATE_DEMANDE": d.DATE_DEMANDE.isoformat() if d.DATE_DEMANDE else None,
@@ -278,7 +265,7 @@ def accept_recommendation(
     ).first()
     if not d:
         raise HTTPException(status_code=404, detail="Request not found")
-    if d.ORIGIN not in ("clinician", "slm") or d.STATUT != "APPROUVE":
+    if d.ORIGIN != "slm" or d.STATUT != "APPROUVE":
         raise HTTPException(status_code=400, detail="Only recommended wheelchairs can be accepted")
     if d.PATIENT_ACCEPT:
         raise HTTPException(status_code=400, detail="Already accepted")

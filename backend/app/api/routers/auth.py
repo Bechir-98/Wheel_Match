@@ -6,8 +6,7 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.models import Comercant, Patient, Utilisateur
 from app.schemas.auth import RegisterRequest
-from app.services.user_profile import build_display_name
-from app.services.messaging import locale_of, text
+from app.services.messaging import display_name, locale_of, text
 from app.services.auth_service import (
     create_access_token,
     find_user_by_email,
@@ -71,7 +70,6 @@ async def login(request: Request, db: Session = Depends(get_db)):
         str(user.ID_UTILISATUER),
         {"role": role, "email": user.EMAIL},
     )
-    display_name = build_display_name(db, user, role)
 
     return {
         "success": True,
@@ -82,7 +80,7 @@ async def login(request: Request, db: Session = Depends(get_db)):
         "user_id": user.ID_UTILISATUER,
         "user_type": role,
         "email": user.EMAIL,
-        "display_name": display_name,
+        "display_name": display_name(db, user.ID_UTILISATUER),
         "debug": {
             "user_id": user.ID_UTILISATUER,
             "user_type": role,
@@ -155,7 +153,6 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
         str(u.ID_UTILISATUER),
         {"role": role, "email": u.EMAIL},
     )
-    display_name = build_display_name(db, u, role)
 
     return {
         "success": True,
@@ -166,5 +163,5 @@ def register(body: RegisterRequest, request: Request, db: Session = Depends(get_
         "user_id": u.ID_UTILISATUER,
         "user_type": role,
         "email": u.EMAIL,
-        "display_name": display_name,
+        "display_name": display_name(db, u.ID_UTILISATUER),
     }

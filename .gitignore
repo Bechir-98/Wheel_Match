@@ -32,6 +32,10 @@ htmlcov/
 # Database
 *.sqlite3
 
+# Uploads (runtime images, keep dir via .gitkeep)
+backend/uploads/*
+!backend/uploads/.gitkeep
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

@@ -9,7 +9,7 @@ from sqlalchemy import text
 from app.api.routers import auth, chat, messages, patient_portal, recommendations, reference, users, vendor_portal, wheelchairs
 from app.core.config import settings
 from app.db.session import SessionLocal, engine
-from app.models.tables import Conversation, KBChunk, MedicalEntry, Message, PatientMedical, UserPreferences, DemandeFauteuil
+from app.models.tables import Conversation, KBChunk, Message, PatientMedical, UserPreferences, DemandeFauteuil
 from app.services.kb_builder import rebuild_knowledge_base
 
 
@@ -24,13 +24,13 @@ async def lifespan(app: FastAPI):
     DemandeFauteuil.__table__.create(bind=engine, checkfirst=True)
     Conversation.__table__.create(bind=engine, checkfirst=True)
     Message.__table__.create(bind=engine, checkfirst=True)
-    MedicalEntry.__table__.create(bind=engine, checkfirst=True)
     KBChunk.__table__.create(bind=engine, checkfirst=True)
 
     # ponytail: in-place columns for existing DBs, proper migrations when schema grows
     with engine.begin() as conn:
         conn.execute(text('ALTER TABLE "DEMANDE_FAUTEUIL" ADD COLUMN IF NOT EXISTS "ORIGIN" VARCHAR(16) DEFAULT \'patient\''))
-        conn.execute(text('ALTER TABLE "PATIENT_MEDICAL" ADD COLUMN IF NOT EXISTS "SOURCE" VARCHAR(16) DEFAULT \'clinician\''))
+        conn.execute(text('ALTER TABLE "PATIENT_MEDICAL" ADD COLUMN IF NOT EXISTS "SOURCE" VARCHAR(16) DEFAULT \'self\''))
+        conn.execute(text('ALTER TABLE "PATIENT_MEDICAL" ALTER COLUMN "SOURCE" SET DEFAULT \'self\''))
         conn.execute(text('ALTER TABLE "DEMANDE_FAUTEUIL" ADD COLUMN IF NOT EXISTS "PATIENT_ACCEPT" BOOLEAN'))
         conn.execute(text('ALTER TABLE "FAUTEUIL" ADD COLUMN IF NOT EXISTS "IMAGE" VARCHAR(512)'))
 

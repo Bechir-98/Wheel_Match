@@ -52,8 +52,8 @@ const WheelchairDetail = () => {
         if (!res.ok) throw new Error(t('detail.notFoundError'));
         const data = await res.json();
 
-        const relatedRes = await fetch(apiUrl(`/wheelchairs/related/list?type=${data.ID_TYPE}&exclude=${id}`));
-        setRelatedWheelchairs(relatedRes.ok ? await relatedRes.json() : []);
+        const relatedRes = await fetch(apiUrl(`/wheelchairs?type=${data.ID_TYPE}&exclude=${id}`));
+        setRelatedWheelchairs(relatedRes.ok ? (await relatedRes.json()).slice(0, 4) : []);
 
         setWheelchair(data);
 

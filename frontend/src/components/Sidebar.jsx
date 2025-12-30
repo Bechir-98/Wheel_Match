@@ -19,7 +19,6 @@ function Sidebar({ role, user: userProp }) {
       { to: '/patient-dashboard', label: t('sidebar.dashboard') },
       { to: '/profile', label: t('sidebar.profile') },
       { to: '/choisis', label: t('sidebar.myWheelchairs') },
-      { to: '/record', label: t('sidebar.records') },
       { to: '/messages', label: t('sidebar.messages') },
       { to: '/settings', label: t('sidebar.settings') },
     ];

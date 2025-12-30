@@ -1,22 +1,19 @@
 """Rule-first wheelchair ranking with optional SLM re-rank."""
 
 import json
-import re
 import urllib.request
 
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.models import Consultation, EstAssocie, Fauteuil, Patient, PatientMedical, Pathologie, TypeFauteuil
+from app.services.docscan_service import _FENCE_RE
 
 DISCLAIMER = "Assistive suggestion, not a medical prescription. Confirm with a professional/vendor."
 
 # ponytail: rule ranking is the fallback; SLM only re-orders top candidates
 SLM_TIMEOUT_S = 15
 SLM_CONTEXT_N = 20
-
-# ponytail: small models wrap JSON in fences despite json_object mode; strip once
-_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.DOTALL)
 
 
 def _parse_json_lenient(raw: str) -> dict:
