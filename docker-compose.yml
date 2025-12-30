@@ -26,19 +26,22 @@ services:
     env_file:
       - ./backend/.env
     environment:
-      - SLM_URL=http://slm:11434
+      - SLM_URL=http://slm:8080
     volumes:
       - ./backend/app:/app/app
       - ./backend/uploads:/app/uploads
 
-  # ponytail: CPU-only Ollama sidecar; rule ranking serves when slm is down
+  # ponytail: CPU-only llama-server; rule ranking serves when slm is down
   slm:
-    image: ollama/ollama:latest
+    image: ghcr.io/ggml-org/llama.cpp:server
     volumes:
-      - ollama-models:/root/.ollama
+      - llama-models:/models
     environment:
-      - OLLAMA_MODELS=/root/.ollama
-    command: sh -c "ollama serve & sleep 5; ollama pull qwen2.5:0.5b; wait"
+      - LLAMA_ARG_MODEL_URL=https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf?download=true
+      - LLAMA_ARG_MODEL=/models/qwen2.5-0.5b-instruct-q4_k_m.gguf
+      - LLAMA_ARG_CTX_SIZE=4096
+      - LLAMA_ARG_N_PARALLEL=2
+      - LLAMA_ARG_PORT=8080
 
   frontend:
     build: ./frontend
@@ -51,4 +54,4 @@ services:
 
 volumes:
   pgdata:
-  ollama-models:
+  llama-models:

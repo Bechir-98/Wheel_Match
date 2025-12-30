@@ -45,7 +45,7 @@ def get_patient_profile(db: Session, uid: int) -> dict:
 
 
 def _slm_rerank(profile: dict, candidates: list[dict]) -> tuple[list[dict], bool]:
-    """Ask Ollama sidecar to re-order candidates. Never raises; falls back to input order."""
+    """Ask llama-server sidecar to re-order candidates. Never raises; falls back to input order."""
     url = (settings.slm_url or "").strip()
     if not url or not candidates:
         return candidates, False
@@ -63,13 +63,24 @@ def _slm_rerank(profile: dict, candidates: list[dict]) -> tuple[list[dict], bool
         f"Candidates:\n{chairs}"
     )
     body = json.dumps(
-        {"model": settings.slm_model, "prompt": prompt, "format": "json", "stream": False}
+        {
+            "messages": [{"role": "user", "content": prompt}],
+            "response_format": {"type": "json_object"},
+            "stream": False,
+            "n_predict": 512,
+        }
     ).encode()
     try:
-        req = urllib.request.Request(f"{url.rstrip('/')}/api/generate", data=body, method="POST")
+        req = urllib.request.Request(
+            f"{url.rstrip('/')}/v1/chat/completions",
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
         with urllib.request.urlopen(req, timeout=SLM_TIMEOUT_S) as res:
             outer = json.loads(res.read().decode())
-        parsed = json.loads(outer.get("response", "{}"))
+        content = outer["choices"][0]["message"]["content"]
+        parsed = json.loads(content)
         items = parsed.get("recommendations", [])
         by_id = {c["ID_FAUTEUIL"]: dict(c) for c in candidates}
         out = []

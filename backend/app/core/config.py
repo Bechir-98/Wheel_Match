@@ -14,8 +14,8 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24 * 7
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
-    slm_url: str = Field(default="http://slm:11434", validation_alias="SLM_URL")
-    slm_model: str = Field(default="qwen2.5:0.5b", validation_alias="SLM_MODEL")
+    slm_url: str = Field(default="http://slm:8080", validation_alias="SLM_URL")
+    slm_model: str = Field(default="qwen2.5-0.5b-instruct-q4_k_m.gguf", validation_alias="SLM_MODEL")
 
     @property
     def cors_origin_list(self) -> list[str]:

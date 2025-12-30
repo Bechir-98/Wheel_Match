@@ -7,8 +7,8 @@
 ## AI matching (clinician role retired)
 
 Wheelchair ranking is rule-first (`EstAssocie` + propulsion + in-stock) via
-`GET /api/v1/patient/recommendations`, with an optional Ollama re-rank
-(`slm` service in `docker-compose.yml`, model `qwen2.5:0.5b`). The SLM never
+`GET /api/v1/patient/recommendations`, with an optional llama.cpp re-rank
+(`slm` service in `docker-compose.yml`, `Qwen2.5-0.5B-Instruct` Q4_K_M GGUF). The SLM never
 writes approvals: a patient's choice from the ranking is final at creation
 (`STATUT="APPROUVE"`, `ORIGIN="slm"`). History tables (`Consultation`,
 `MedicalEntry`) and old request notes are kept; `CLINICIEN`,
@@ -18,7 +18,7 @@ writes approvals: a patient's choice from the ranking is final at creation
 Runbook (Docker daemon required, in order):
 
 ```bash
-docker compose up --build                                   # pulls the SLM model on first boot
+docker compose up --build                                   # downloads the GGUF into llama-models on first boot
 docker compose exec backend python scripts/eval_recommend.py # rule recall@3, exit 1 under 0.8
 curl -X POST http://localhost:8000/api/v1/chat/rebuild-kb   # re-embed KB, purges role_clinician
 cat backend/scripts/drop_clinician.sql | docker compose exec -T db psql -U postgres -d wheel
