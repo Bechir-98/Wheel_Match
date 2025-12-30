@@ -1,12 +1,37 @@
 # Wheel Match
 
-> A full-stack web platform connecting **patients**, **clinicians**, and **vendors** to streamline wheelchair selection and management through intelligent matching.
+> A full-stack web platform connecting **patients** and **vendors** to streamline wheelchair selection through AI matching.
+
+---
+
+## AI matching (clinician role retired)
+
+Wheelchair ranking is rule-first (`EstAssocie` + propulsion + in-stock) via
+`GET /api/v1/patient/recommendations`, with an optional Ollama re-rank
+(`slm` service in `docker-compose.yml`, model `qwen2.5:0.5b`). The SLM never
+writes approvals: a patient's choice from the ranking is final at creation
+(`STATUT="APPROUVE"`, `ORIGIN="slm"`). History tables (`Consultation`,
+`MedicalEntry`) and old request notes are kept; `CLINICIEN`,
+`CLINICIAN_PATIENT`, `LINK_REQUEST` are dropped by
+`backend/scripts/drop_clinician.sql`.
+
+Runbook (Docker daemon required, in order):
+
+```bash
+docker compose up --build                                   # pulls the SLM model on first boot
+docker compose exec backend python scripts/eval_recommend.py # rule recall@3, exit 1 under 0.8
+curl -X POST http://localhost:8000/api/v1/chat/rebuild-kb   # re-embed KB, purges role_clinician
+cat backend/scripts/drop_clinician.sql | docker compose exec -T db psql -U postgres -d wheel
+```
+
+`backend/.env` is gitignored and required locally
+(`DATABASE_URL`, `SECRET_KEY`, `GEMINI_API_KEY`, optional `SLM_URL`/`SLM_MODEL`).
 
 ---
 
 ## Overview
 
-Wheel Match is a role-based healthcare mobility platform that helps patients find the right wheelchair based on their medical profile (morphology, pathologies, usage habits), while giving clinicians tools to manage consultations and approvals, and vendors a dashboard to manage their inventory.
+Wheel Match is a role-based healthcare mobility platform that helps patients find the right wheelchair based on their medical profile (morphology, pathologies, usage habits), ranked by a rule-first engine with an optional SLM re-rank, and vendors a dashboard to manage their inventory.
 
 ---
 
