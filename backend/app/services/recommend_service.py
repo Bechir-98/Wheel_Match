@@ -6,7 +6,7 @@ import urllib.request
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models import Consultation, EstAssocie, Fauteuil, Patient, PatientMedical, Pathologie, TypeFauteuil
+from app.models import Consultation, EstAssocie, Fauteuil, KBChunk, Morphologie, Patient, PatientMedical, Pathologie, TypeFauteuil
 from app.services.docscan_service import _FENCE_RE
 
 DISCLAIMER = "Assistive suggestion, not a medical prescription. Confirm with a professional/vendor."
@@ -41,11 +41,16 @@ def get_patient_profile(db: Session, uid: int) -> dict:
         morphology = (cons[0].NOM_ORG or "").strip()
 
     propulsion = ((p.UTILISATION_PRPL or "") if p else "").strip().upper() if p else ""
+    try:
+        height_m = float(p.TAILLE) if p is not None and p.TAILLE is not None else None
+    except (TypeError, ValueError):
+        height_m = None
     return {
         "pathology_ids": path_ids,
         "pathology_names": path_names,
         "morphology": morphology,
         "propulsion": propulsion,
+        "height_m": height_m,
     }
 
 
@@ -131,6 +136,27 @@ def rule_rank(db: Session, profile: dict, context_n: int = SLM_CONTEXT_N) -> lis
 
     want_electric = "ELECTRIQUE" in (profile.get("propulsion") or "")
 
+    # ponytail: no per-chair size column yet, so morphology is a per-patient
+    # fit term (declared morphology + height tolerance vs MORPHOLOGIE ref).
+    # Per-chair fit column when vendors track sizes.
+    morph = (profile.get("morphology") or "").strip()
+    morph_fit = False
+    morph_ref = None
+    if morph:
+        try:
+            row = db.query(Morphologie).filter(Morphologie.NOM_ORG == morph).first()
+            morph_ref = float(row.TAILLEO) if row is not None and row.TAILLEO is not None else None
+        except Exception:
+            morph_ref = None
+        height = profile.get("height_m")
+        if height is not None and morph_ref is not None:
+            try:
+                morph_fit = abs(float(height) - morph_ref) <= 0.30
+            except (TypeError, ValueError):
+                morph_fit = True
+        else:
+            morph_fit = True
+
     scored = []
     for f, nom_type in rows:
         score = 0
@@ -142,6 +168,10 @@ def rule_rank(db: Session, profile: dict, context_n: int = SLM_CONTEXT_N) -> lis
         if (want_electric and is_electric) or (not want_electric and not is_electric):
             score += 1
             reasons.append("Matches your propulsion preference")
+        if morph_fit:
+            score += 1
+            detail = f" ({morph})" if morph else ""
+            reasons.append(f"Fits your morphology{detail}")
         if not reasons:
             reasons.append("Available in stock")
         scored.append((score, f.ID_FAUTEUIL, f, nom_type, reasons))
@@ -163,11 +193,42 @@ def rule_rank(db: Session, profile: dict, context_n: int = SLM_CONTEXT_N) -> lis
     ]
 
 
+def _attach_sources(db: Session, profile: dict, recs: list[dict]) -> list[dict]:
+    """Ground each recommendation with its pgvector KB chunks. Never raises."""
+    if not recs:
+        return recs
+    try:
+        wc_ids = [f"wc_{r['ID_FAUTEUIL']}" for r in recs]
+        assoc_ids = [
+            f"assoc_{pid}_{r['ID_FAUTEUIL']}"
+            for pid in (profile.get("pathology_ids") or [])
+            for r in recs
+        ]
+        rows = db.query(KBChunk).filter(KBChunk.ID.in_(wc_ids + assoc_ids)).all()
+        by_id = {r.ID: r for r in rows}
+    except Exception as e:
+        print(f"KB sources skipped: {e}")
+        return [{**r, "sources": []} for r in recs]
+    out = []
+    for r in recs:
+        sources = []
+        wc = by_id.get(f"wc_{r['ID_FAUTEUIL']}")
+        if wc is not None:
+            sources.append({"id": wc.ID, "text": wc.TEXT, "type": wc.TYPE})
+        for pid in (profile.get("pathology_ids") or []):
+            a = by_id.get(f"assoc_{pid}_{r['ID_FAUTEUIL']}")
+            if a is not None:
+                sources.append({"id": a.ID, "text": a.TEXT, "type": a.TYPE})
+        out.append({**r, "sources": sources})
+    return out
+
+
 def recommend(db: Session, uid: int, limit: int = 3) -> dict:
     profile = get_patient_profile(db, uid)
     candidates = rule_rank(db, profile)
     ranked, slm_used = _slm_rerank(profile, candidates)
     recs = ranked[: max(1, min(limit, 10))]
+    recs = _attach_sources(db, profile, recs)
     return {
         "profile": {
             "pathology_names": profile["pathology_names"],
