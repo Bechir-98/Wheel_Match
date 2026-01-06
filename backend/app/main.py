@@ -30,6 +30,7 @@ async def lifespan(app: FastAPI):
     # ponytail: in-place columns for existing DBs, proper migrations when schema grows
     with engine.begin() as conn:
         conn.execute(text('ALTER TABLE "DEMANDE_FAUTEUIL" ADD COLUMN IF NOT EXISTS "ORIGIN" VARCHAR(16) DEFAULT \'patient\''))
+        conn.execute(text('ALTER TABLE "PATIENT_MEDICAL" ADD COLUMN IF NOT EXISTS "SOURCE" VARCHAR(16) DEFAULT \'clinician\''))
         conn.execute(text('ALTER TABLE "DEMANDE_FAUTEUIL" ADD COLUMN IF NOT EXISTS "PATIENT_ACCEPT" BOOLEAN'))
         conn.execute(text('ALTER TABLE "FAUTEUIL" ADD COLUMN IF NOT EXISTS "IMAGE" VARCHAR(512)'))
 
