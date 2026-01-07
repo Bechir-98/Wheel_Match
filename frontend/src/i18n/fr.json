@@ -371,7 +371,16 @@
     "morphRecorded": "Morphologie enregistrée : {{v}}",
     "backDash": "Retour au tableau de bord",
     "browse": "Parcourir les fauteuils",
-    "loadingAria": "Chargement"
+    "loadingAria": "Chargement",
+    "editTitle": "Mes infos médicales",
+    "selectMorphology": "Choisir la morphologie",
+    "selectPathology": "Choisir la pathologie",
+    "save": "Enregistrer",
+    "saved": "Infos médicales enregistrées.",
+    "scanLabel": "Ou scanner un compte-rendu (PDF ou photo)",
+    "scanHint": "Les valeurs pré-remplissent le formulaire — vérifiez puis enregistrez. Le fichier n’est pas conservé.",
+    "scanning": "Lecture du compte-rendu…",
+    "scanReview": "Trouvé : {{path}} / {{morph}} (confiance {{conf}} %). Vérifiez puis enregistrez."
   },
   "catalog": {
     "title": "Catalogue de fauteuils roulants",

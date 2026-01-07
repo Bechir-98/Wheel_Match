@@ -1,6 +1,7 @@
 """Rule-first wheelchair ranking with optional SLM re-rank."""
 
 import json
+import re
 import urllib.request
 
 from sqlalchemy.orm import Session
@@ -13,6 +14,13 @@ DISCLAIMER = "Assistive suggestion, not a medical prescription. Confirm with a p
 # ponytail: rule ranking is the fallback; SLM only re-orders top candidates
 SLM_TIMEOUT_S = 15
 SLM_CONTEXT_N = 20
+
+# ponytail: small models wrap JSON in fences despite json_object mode; strip once
+_FENCE_RE = re.compile(r"^```(?:json)?\s*|\s*```$", re.DOTALL)
+
+
+def _parse_json_lenient(raw: str) -> dict:
+    return json.loads(_FENCE_RE.sub("", raw.strip()))
 
 
 def get_patient_profile(db: Session, uid: int) -> dict:
@@ -70,35 +78,37 @@ def _slm_rerank(profile: dict, candidates: list[dict]) -> tuple[list[dict], bool
             "n_predict": 512,
         }
     ).encode()
-    try:
-        req = urllib.request.Request(
-            f"{url.rstrip('/')}/v1/chat/completions",
-            data=body,
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        with urllib.request.urlopen(req, timeout=SLM_TIMEOUT_S) as res:
-            outer = json.loads(res.read().decode())
-        content = outer["choices"][0]["message"]["content"]
-        parsed = json.loads(content)
-        items = parsed.get("recommendations", [])
-        by_id = {c["ID_FAUTEUIL"]: dict(c) for c in candidates}
-        out = []
-        for it in items:
-            c = by_id.pop(int(it["id_fauteuil"]), None)
-            if c is None:
-                continue
-            c["score"] = it.get("score", c["score"])
-            if (it.get("reason") or "").strip():
-                c["reasons"] = [(it["reason"] or "").strip()]
-            out.append(c)
-        # Any ids the SLM dropped keep rule order at the end
-        out.extend(sorted(by_id.values(), key=lambda c: (-c["score"], c["ID_FAUTEUIL"])))
-        print(f"SLM re-rank ok ({settings.slm_model}, {len(out)} candidates)")
-        return out, True
-    except Exception as e:
-        print(f"SLM re-rank skipped, using rule ranking: {e}")
-        return candidates, False
+    # ponytail: one retry; 0.5B models intermittently emit non-JSON
+    last_err: Exception | None = None
+    for _ in range(2):
+        try:
+            req = urllib.request.Request(
+                f"{url.rstrip('/')}/v1/chat/completions",
+                data=body,
+                headers={"Content-Type": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=SLM_TIMEOUT_S) as res:
+                outer = json.loads(res.read().decode())
+            content = outer["choices"][0]["message"]["content"]
+            parsed = _parse_json_lenient(content)
+            items = parsed.get("recommendations", [])
+            by_id = {c["ID_FAUTEUIL"]: dict(c) for c in candidates}
+            out = []
+            for it in items:
+                # ponytail: SLM decides order only; scores+reasons stay rule-based (tiny models hallucinate prose)
+                c = by_id.pop(int(it["id_fauteuil"]), None)
+                if c is None:
+                    continue
+                out.append(c)
+            # Any ids the SLM dropped keep rule order at the end
+            out.extend(sorted(by_id.values(), key=lambda c: (-c["score"], c["ID_FAUTEUIL"])))
+            print(f"SLM re-rank ok ({settings.slm_model}, {len(out)} candidates)")
+            return out, True
+        except Exception as e:
+            last_err = e
+    print(f"SLM re-rank skipped, using rule ranking: {last_err}")
+    return candidates, False
 
 
 def rule_rank(db: Session, profile: dict, context_n: int = SLM_CONTEXT_N) -> list[dict]:
