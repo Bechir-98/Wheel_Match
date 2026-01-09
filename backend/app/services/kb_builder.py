@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import (
     Fauteuil, TypeFauteuil, Pathologie, Morphologie,
-    Composant, Option, EstAssocie, DemandeFauteuil
+    Composant, Option, EstAssocie
 )
 
 EMBEDDING_MODEL = "gemini-embedding-001"
@@ -84,7 +84,7 @@ def get_gemini_api_key() -> str:
     return getattr(settings, 'gemini_api_key', None) or os.getenv("GEMINI_API_KEY", "")
 
 
-def embed_text(text: str) -> list[float]:
+def embed_text(text: str, task_type: str = "RETRIEVAL_DOCUMENT") -> list[float]:
     api_key = get_gemini_api_key()
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured")
@@ -92,7 +92,7 @@ def embed_text(text: str) -> list[float]:
     result = client.models.embed_content(
         model=EMBEDDING_MODEL,
         contents=text,
-        config=types.EmbedContentConfig(task_type="RETRIEVAL_DOCUMENT")
+        config=types.EmbedContentConfig(task_type=task_type)
     )
     return result.embeddings[0].values
 

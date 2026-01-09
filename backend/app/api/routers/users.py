@@ -1,7 +1,7 @@
 import json
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, get_current_user_with_role
@@ -52,41 +52,6 @@ def patch_me(
 ):
     user, role = ctx
     apply_profile_update(db, user, role, body)
-    return {"success": True, "message": "Updated"}
-
-
-@router.get("/profile")
-def get_profile_legacy(
-    db: Session = Depends(get_db),
-    id_utilisateur: int = Query(...),
-    type: str = Query(..., alias="type"),
-    user: Utilisateur = Depends(get_current_user),
-):
-    """Backward-compatible query params; must match authenticated user."""
-    if user.ID_UTILISATUER != id_utilisateur:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    role = type.lower()
-    if role == "commercant":
-        role = "vendor"
-    return build_profile_payload(db, user, role)
-
-
-@router.post("/profile")
-def post_profile_legacy(
-    body: dict[str, Any],
-    db: Session = Depends(get_db),
-    user: Utilisateur = Depends(get_current_user),
-):
-    """Accepts legacy shape with id_utilisateur + type in body."""
-    uid = body.get("id_utilisateur")
-    rtype = (body.get("type") or "").lower()
-    if uid != user.ID_UTILISATUER:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
-    if rtype in ("commercant", "vendor"):
-        rtype = "vendor"
-    if rtype == "patient":
-        rtype = "patient"
-    apply_profile_update(db, user, rtype, body)
     return {"success": True, "message": "Updated"}
 
 

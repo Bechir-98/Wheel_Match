@@ -1,40 +1,21 @@
 import json
-import os
 from typing import AsyncGenerator, List
 
 from google import genai
 from google.genai import types
 
-from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models import KBChunk
 from app.schemas.chat import ChatMessage
+from app.services.kb_builder import embed_text, get_gemini_api_key
 
-EMBEDDING_MODEL = "gemini-embedding-001"
 CHAT_MODEL = "gemini-2.5-flash"
 TOP_K = 5
 
 
-def get_gemini_api_key() -> str:
-    return getattr(settings, 'gemini_api_key', None) or os.getenv("GEMINI_API_KEY", "")
-
-
-def embed_text(text: str) -> List[float]:
-    api_key = get_gemini_api_key()
-    if not api_key:
-        raise ValueError("GEMINI_API_KEY not configured")
-    client = genai.Client(api_key=api_key)
-    result = client.models.embed_content(
-        model=EMBEDDING_MODEL,
-        contents=text,
-        config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY")
-    )
-    return result.embeddings[0].values
-
-
 def retrieve_relevant_chunks(query: str, top_k: int = TOP_K) -> List[dict]:
     # ponytail: exact cosine scan via pgvector, HNSW index when chunks reach thousands
-    query_embedding = embed_text(query)
+    query_embedding = embed_text(query, task_type="RETRIEVAL_QUERY")
     db = SessionLocal()
     try:
         rows = (

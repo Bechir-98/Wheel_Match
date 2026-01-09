@@ -7,6 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import DashboardShell from '../components/dashboard/DashboardShell.jsx';
+import MedicalRecordForm from '../components/MedicalRecordForm.jsx';
 import { apiUrl, authHeaders } from '../config/api.js';
 
 function formatDate(iso) {
@@ -79,8 +80,8 @@ function PatientDashboard() {
   const stats = data?.stats;
   const consultations = data?.consultations || [];
   const medical = data?.medical;
-  const upcomingList = consultations.filter((c) => c.is_upcoming).slice(0, 5);
-  const recentList = consultations.slice(0, 5);
+  const upcomingList = consultations.filter((c) => c.is_upcoming);
+  const recentList = consultations;
 
   const checklist = [
     { label: t('patientDash.check1'), done: !!stats?.medical_record_filled },
@@ -169,11 +170,11 @@ function PatientDashboard() {
                       <Card key={c.num_consultation} className="mb-2">
                         <CardContent className="flex flex-wrap justify-between items-center gap-2 pt-6">
                           <div className="flex items-center">
-                            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted font-semibold">{initials(c.clinician_name)}</div>
+                            <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-muted font-semibold">{initials(c.author_name)}</div>
                             <div>
                               <h6 className="mb-1 font-semibold">{c.pathology_name}</h6>
                               <div className="small text-muted-foreground text-sm">
-                                {c.clinician_name} · {formatDate(c.date_consultation)}
+                                {c.author_name} · {formatDate(c.date_consultation)}
                               </div>
                               <div className="small text-sm">{t('patientDash.morphology', { v: c.morphology })}</div>
                             </div>
@@ -183,9 +184,6 @@ function PatientDashboard() {
                       </Card>
                     ))}
                     <div className="text-center mt-3 flex flex-wrap gap-2 justify-center">
-                      <Button asChild>
-                        <Link to="/record">{t('patientDash.fullRecord')}</Link>
-                      </Button>
                       <Button variant="outline" asChild>
                         <Link to="/wheelchairs">{t('patientDash.browseCatalog', { count: stats.catalog_wheelchairs })}</Link>
                       </Button>
@@ -235,10 +233,8 @@ function PatientDashboard() {
                     ) : (
                       <p className="text-muted-foreground mb-0">{t('patientDash.medEmpty')}</p>
                     )}
-                    <div className="text-center mt-3">
-                      <Button variant="outline" asChild>
-                        <Link to="/record">{t('patientDash.viewDetails')}</Link>
-                      </Button>
+                    <div className="mt-4 border-t pt-4">
+                      <MedicalRecordForm initial={medical} onSaved={() => load()} />
                     </div>
                   </CardContent>
                 </Card>
@@ -258,7 +254,7 @@ function PatientDashboard() {
                             <div>
                               <strong>{r.NOM_TYPE}</strong>
                               <div className="small text-muted-foreground text-sm">{formatDate(r.DATE_DEMANDE)}</div>
-                              {r.NOTES_CLINICIEN && <div className="small text-amber-600 mt-1 text-sm">{t('patientDash.reqNote', { v: r.NOTES_CLINICIEN })}</div>}
+                              {r.NOTES && <div className="small text-amber-600 mt-1 text-sm">{t('patientDash.reqNote', { v: r.NOTES })}</div>}
                             </div>
                             <Badge
                               variant={r.STATUT === 'APPROUVE' ? 'default' : r.STATUT === 'REJETE' ? 'destructive' : 'secondary'}

@@ -22,9 +22,6 @@ function Log() {
     const formData = new FormData(e.target);
 
     try {
-      console.log('Sending login request...');
-      console.log('Form data:', Object.fromEntries(formData));
-
       const response = await fetch(apiUrl('/auth/login'), {
         method: 'POST',
         body: formData,
@@ -34,9 +31,6 @@ function Log() {
         },
         mode: 'cors',
       });
-
-      console.log('Response status:', response.status);
-      console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       const raw = await response.text();
       let data;
@@ -58,7 +52,7 @@ function Log() {
         );
         return;
       }
-      console.log('Response data:', data);      if (data.success) {
+      if (data.success) {
         if (data.token) {
           localStorage.setItem('token', data.token);
         }
@@ -85,7 +79,6 @@ function Log() {
         setDebugInfo(data.debug);
       }
     } catch (err) {
-      console.error('Login error:', err);
       if (err.message.includes('Failed to fetch')) {
         setError(t('auth.cannotConnect'));
       } else if (err.message.includes('HTTP error')) {

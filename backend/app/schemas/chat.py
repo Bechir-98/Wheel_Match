@@ -10,7 +10,3 @@ class ChatMessage(BaseModel):
 class ChatRequest(BaseModel):
     message: str
     history: Optional[List[ChatMessage]] = []
-
-
-class ChatResponse(BaseModel):
-    text: str

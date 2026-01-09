@@ -3,6 +3,7 @@ import Home from '../pages/home.jsx';
 import Sign from '../pages/sign.jsx';
 import Log from '../pages/log.jsx';
 import Navb from '../layouts/nav.jsx';
+import Footer from '../layouts/footer.jsx';
 import FAQ from '../pages/Faq.jsx';
 import About from '../pages/About.jsx';
 
@@ -10,12 +11,11 @@ import VendorDashboard from '../pages/VendorDashboard.jsx';
 import PatientDashboard from '../pages/Patient_Dashboard.jsx';
 
 import WheelchairDetails from '../pages/WheelchairsPage.jsx';
-import WheelchairDetail from '../components/WheelchairDetail';
+import WheelchairDetail from '../pages/WheelchairDetailPage.jsx';
 
 import MyProfile from '../pages/dashboard/MyProfile.jsx';
 import Messages from '../pages/dashboard/Messages.jsx';
 import Settings from '../pages/dashboard/Settings.jsx';
-import Record from '../pages/record.jsx';
 import ProductsPage from '../pages/products.jsx';
 import ChoisisPage from '../pages/choisis.jsx';
 
@@ -92,14 +92,6 @@ function RouteR() {
               }
             />
             <Route
-              path="/record"
-              element={
-                <ProtectedRoute>
-                  <Record />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="/products"
               element={
                 <ProtectedRoute>
@@ -119,6 +111,7 @@ function RouteR() {
             <Route path="/faq" element={<FAQ />} />
             <Route path="/about" element={<About />} />
           </Routes>
+          <Footer />
         </div>
       </AuthProvider>
     </Router>

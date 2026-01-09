@@ -150,7 +150,7 @@ class UserPreferences(Base):
 
 
 class PatientMedical(Base):
-    """Latest snapshot; see MedicalEntry for append-only history."""
+    """Latest self-reported snapshot."""
 
     __tablename__ = "PATIENT_MEDICAL"
 
@@ -159,19 +159,18 @@ class PatientMedical(Base):
     MORPHOLOGIE = Column(String(255), nullable=True)
     PATHOLOGIE = Column(String(255), nullable=True)
     NOTES = Column(Text, nullable=True)
-    # ponytail: origin of the snapshot (clinician legacy, self form, pdf scan)
-    SOURCE = Column(String(16), nullable=False, default="clinician")
+    # ponytail: origin of the snapshot (self form, pdf scan)
+    SOURCE = Column(String(16), nullable=False, default="self")
     UPDATED_AT = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 class DemandeFauteuil(Base):
-    __tablename__ = "DEMANDE_FAUTEUIL"
     __tablename__ = "DEMANDE_FAUTEUIL"
 
     ID_DEMANDE = Column(Integer, primary_key=True, autoincrement=True)
     ID_PATIENT = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
     ID_FAUTEUIL = Column(Integer, ForeignKey("FAUTEUIL.ID_FAUTEUIL"), nullable=False)
     STATUT = Column(String(32), nullable=False, default="EN_ATTENTE")
-    NOTES_CLINICIEN = Column(Text, nullable=True)
+    NOTES = Column(Text, nullable=True)
     # ponytail: origin+accept drive the two flows; add when vendor counters need more
     ORIGIN = Column(String(16), nullable=False, default="patient")
     PATIENT_ACCEPT = Column(Boolean, nullable=True)
@@ -216,26 +215,3 @@ class KBChunk(Base):
     TYPE = Column(String(64), nullable=False, default="")
     METADATA = Column(JSONB, nullable=False, default=dict)
     EMBEDDING = Column(Vector(3072))
-
-
-class MedicalEntry(Base):
-    """Append-only clinical assessments; PatientMedical mirrors the latest."""
-
-    __tablename__ = "MEDICAL_ENTRY"
-
-    ID = Column(Integer, primary_key=True, autoincrement=True)
-    PATIENT_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False, index=True)
-    CLINICIAN_ID = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
-    DIAGNOSIS = Column(String(128), nullable=False)
-    ONSET_DATE = Column(Date, nullable=True)
-    SEVERITY = Column(String(16), nullable=True)
-    AFFECTED_AREAS = Column(Text, nullable=True)
-    MORPHOLOGY = Column(String(128), nullable=False)
-    SEAT_WIDTH_CM = Column(Numeric(5, 1), nullable=True)
-    SEAT_DEPTH_CM = Column(Numeric(5, 1), nullable=True)
-    BACKREST_HEIGHT_CM = Column(Numeric(5, 1), nullable=True)
-    TRANSFERS = Column(String(16), nullable=True)
-    PROPULSION_RECO = Column(String(16), nullable=True)
-    NOTES = Column(Text, nullable=True)
-    FOLLOWUP_DATE = Column(Date, nullable=True)
-    CREATED_AT = Column(DateTime, server_default=func.now())
