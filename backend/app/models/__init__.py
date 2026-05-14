@@ -15,6 +15,7 @@ from app.models.tables import (
     TypeFauteuil,
     UserPreferences,
     Utilisateur,
+    DemandeFauteuil,
 )
 
 __all__ = [
@@ -35,4 +36,5 @@ __all__ = [
     "Composant",
     "UserPreferences",
     "PatientMedical",
+    "DemandeFauteuil",
 ]

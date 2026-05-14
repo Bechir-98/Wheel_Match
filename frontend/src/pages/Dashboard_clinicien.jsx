@@ -31,6 +31,7 @@ function ClinicianDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [requests, setRequests] = useState([]);
 
   const load = useCallback(async () => {
     try {
@@ -54,6 +55,11 @@ function ClinicianDashboard() {
         throw new Error(msg);
       }
       setData(json);
+
+      const reqRes = await fetch(apiUrl('/clinician/requests'), { headers: authHeaders() });
+      if (reqRes.ok) {
+        setRequests(await reqRes.json());
+      }
     } catch (e) {
       setError(e.message || 'Failed to load dashboard');
       setData(null);
@@ -70,6 +76,23 @@ function ClinicianDashboard() {
   const today = data?.consultations_today || [];
   const recent = data?.consultations_recent || [];
   const needing = data?.patients_needing_medical_file || [];
+
+  const handleRequestAction = async (demandeId, action) => {
+    try {
+        const res = await fetch(apiUrl(`/clinician/requests/${demandeId}/status`), {
+            method: 'PUT',
+            headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ statut: action })
+        });
+        if (res.ok) {
+            setRequests(requests.map(r => r.ID_DEMANDE === demandeId ? { ...r, STATUT: action } : r));
+        }
+    } catch (e) {
+        console.error(e);
+    }
+  };
+
+  const pendingRequests = requests.filter(r => r.STATUT === 'EN_ATTENTE');
 
   return (
     <DashboardShell role="clinician">
@@ -197,6 +220,59 @@ function ClinicianDashboard() {
                         Open patients
                       </Button>
                     </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            </Row>
+
+            <Row className="mb-4">
+              <Col md={12}>
+                <Card className="dashboard-card">
+                  <Card.Header className="d-flex justify-content-between align-items-center">
+                    <strong>Pending Wheelchair Requests</strong>
+                    <Badge bg="warning" text="dark">{pendingRequests.length}</Badge>
+                  </Card.Header>
+                  <Card.Body>
+                    {pendingRequests.length === 0 ? (
+                      <p className="text-muted mb-0">No pending wheelchair requests to review.</p>
+                    ) : (
+                      <Table responsive hover className="mb-0 align-middle">
+                        <thead>
+                          <tr>
+                            <th>Patient</th>
+                            <th>Wheelchair</th>
+                            <th>Date</th>
+                            <th className="text-end">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {pendingRequests.map((r) => (
+                            <tr key={r.ID_DEMANDE}>
+                              <td>{r.patient_name}</td>
+                              <td>{r.NOM_TYPE}</td>
+                              <td className="text-muted small">{formatDate(r.DATE_DEMANDE)}</td>
+                              <td className="text-end">
+                                <Button 
+                                  size="sm" 
+                                  variant="success" 
+                                  className="me-2"
+                                  onClick={() => handleRequestAction(r.ID_DEMANDE, 'APPROUVE')}
+                                >
+                                  Approve
+                                </Button>
+                                <Button 
+                                  size="sm" 
+                                  variant="outline-danger"
+                                  onClick={() => handleRequestAction(r.ID_DEMANDE, 'REJETE')}
+                                >
+                                  Reject
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </Table>
+                    )}
                   </Card.Body>
                 </Card>
               </Col>

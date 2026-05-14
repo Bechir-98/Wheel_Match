@@ -15,7 +15,11 @@ from app.models import (
     Pathologie,
     PatientMedical,
     Utilisateur,
+    DemandeFauteuil,
+    TypeFauteuil,
 )
+from app.schemas.demandes import DemandeCreate, DemandeOut
+from fastapi import HTTPException, status
 
 router = APIRouter()
 
@@ -115,3 +119,60 @@ def patient_dashboard(
         "consultations": consultations_out,
         "medical": medical_out,
     }
+
+@router.post("/requests", response_model=DemandeOut)
+def create_request(
+    demande: DemandeCreate,
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_patient),
+):
+    # Check if wheelchair exists
+    f = db.query(Fauteuil).filter(Fauteuil.ID_FAUTEUIL == demande.id_fauteuil).first()
+    if not f:
+        raise HTTPException(status_code=404, detail="Fauteuil not found")
+    
+    # Check if already requested and pending
+    existing = db.query(DemandeFauteuil).filter(
+        DemandeFauteuil.ID_PATIENT == user.ID_UTILISATUER,
+        DemandeFauteuil.ID_FAUTEUIL == demande.id_fauteuil,
+        DemandeFauteuil.STATUT == "EN_ATTENTE"
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Request already pending for this wheelchair")
+        
+    db_demande = DemandeFauteuil(
+        ID_PATIENT=user.ID_UTILISATUER,
+        ID_FAUTEUIL=demande.id_fauteuil,
+        STATUT="EN_ATTENTE"
+    )
+    db.add(db_demande)
+    db.commit()
+    db.refresh(db_demande)
+    return db_demande
+
+@router.get("/requests")
+def get_patient_requests(
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_patient),
+):
+    rows = (
+        db.query(DemandeFauteuil, Fauteuil, TypeFauteuil.NOM_TYPE)
+        .join(Fauteuil, DemandeFauteuil.ID_FAUTEUIL == Fauteuil.ID_FAUTEUIL)
+        .join(TypeFauteuil, Fauteuil.ID_TYPE == TypeFauteuil.ID_TYPE)
+        .filter(DemandeFauteuil.ID_PATIENT == user.ID_UTILISATUER)
+        .order_by(DemandeFauteuil.DATE_DEMANDE.desc())
+        .all()
+    )
+    
+    out = []
+    for d, f, nom_type in rows:
+        out.append({
+            "ID_DEMANDE": d.ID_DEMANDE,
+            "ID_FAUTEUIL": d.ID_FAUTEUIL,
+            "NOM_TYPE": nom_type,
+            "STATUT": d.STATUT,
+            "NOTES_CLINICIEN": d.NOTES_CLINICIEN,
+            "DATE_DEMANDE": d.DATE_DEMANDE.isoformat() if d.DATE_DEMANDE else None,
+            "DATE_MAJ": d.DATE_MAJ.isoformat() if d.DATE_MAJ else None,
+        })
+    return out

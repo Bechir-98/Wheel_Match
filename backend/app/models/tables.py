@@ -166,3 +166,17 @@ class PatientMedical(Base):
     PATHOLOGIE = Column(String(255), nullable=True)
     NOTES = Column(Text, nullable=True)
     UPDATED_AT = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+class DemandeFauteuil(Base):
+    __tablename__ = "DEMANDE_FAUTEUIL"
+
+    ID_DEMANDE = Column(Integer, primary_key=True, autoincrement=True)
+    ID_PATIENT = Column(Integer, ForeignKey("UTILISATEUR.ID_UTILISATUER"), nullable=False)
+    ID_FAUTEUIL = Column(Integer, ForeignKey("FAUTEUIL.ID_FAUTEUIL"), nullable=False)
+    STATUT = Column(String(32), nullable=False, default="EN_ATTENTE")
+    NOTES_CLINICIEN = Column(Text, nullable=True)
+    DATE_DEMANDE = Column(DateTime, server_default=func.now())
+    DATE_MAJ = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+    patient = relationship("Utilisateur", foreign_keys=[ID_PATIENT])
+    fauteuil = relationship("Fauteuil", foreign_keys=[ID_FAUTEUIL])

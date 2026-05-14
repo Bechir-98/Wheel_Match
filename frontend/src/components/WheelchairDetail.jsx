@@ -336,7 +336,7 @@ const WheelchairDetail = () => {
                     
                     {/* Price section */}
                     <div className="mb-4">
-                      <h2 className="text-primary fw-bold mb-0" style={{ fontSize: '2rem', color: ' !important' }}>
+                      <h2 className="text-primary fw-bold mb-0" style={{ fontSize: '2rem' }}>
                         {Number(wheelchair.PRIX).toFixed(2)} DT
                       </h2>
                       <small className="text-muted">Tax included. Shipping calculated at checkout.</small>
@@ -731,45 +731,6 @@ const WheelchairDetail = () => {
           </Toast>
         </ToastContainer>
       </Container>
-      
-      {/* CSS Styles */}
-      <style jsx>{`
-        .product-card {
-          transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        .product-card:hover {
-          transform: translateY(-5px);
-          box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
-        }
-        .product-img {
-          transition: opacity 0.3s ease;
-        }
-        .product-card:hover .product-img {
-          opacity: 0.85;
-        }
-        .thumbnail-container {
-          transition: all 0.2s ease;
-        }
-        .thumbnail-container:hover, .thumbnail-container.active {
-          border-color: var(--bs-primary) !important;
-          transform: scale(1.05);
-        }
-        .thumbnail-preview {
-          width: 60px;
-          height: 60px;
-          cursor: pointer;
-          border-radius: 8px;
-          padding: 2px;
-          border: 2px solid transparent;
-          transition: all 0.2s ease;
-        }
-        .thumbnail-preview:hover, .thumbnail-preview.active {
-          border-color: var(--bs-primary) !important;
-        }
-        .transition-all {
-          transition: all 0.3s ease;
-        }
-      `}</style>
     </>
   );
 };

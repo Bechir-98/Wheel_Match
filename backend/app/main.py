@@ -6,13 +6,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routers import auth, clinician_portal, patient_portal, patients, reference, users, vendor_portal, wheelchairs
 from app.core.config import settings
 from app.db.session import engine
-from app.models.tables import PatientMedical, UserPreferences
+from app.models.tables import PatientMedical, UserPreferences, DemandeFauteuil
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     UserPreferences.__table__.create(bind=engine, checkfirst=True)
     PatientMedical.__table__.create(bind=engine, checkfirst=True)
+    DemandeFauteuil.__table__.create(bind=engine, checkfirst=True)
     yield
 
 

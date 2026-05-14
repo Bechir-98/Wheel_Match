@@ -30,6 +30,7 @@ function PatientDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [requests, setRequests] = useState([]);
 
   const load = useCallback(async () => {
     try {
@@ -53,6 +54,11 @@ function PatientDashboard() {
         throw new Error(msg);
       }
       setData(json);
+
+      const reqRes = await fetch(apiUrl('/patient/requests'), { headers: authHeaders() });
+      if (reqRes.ok) {
+        setRequests(await reqRes.json());
+      }
     } catch (e) {
       setError(e.message || 'Failed to load dashboard');
       setData(null);
@@ -227,6 +233,40 @@ function PatientDashboard() {
                     <div className="text-center mt-3">
                       <Button variant="outline-primary" as={Link} to="/record">
                         View details
+                      </Button>
+                    </div>
+                  </Card.Body>
+                </Card>
+
+                <Card className="dashboard-card mt-3">
+                  <Card.Header className="d-flex justify-content-between align-items-center">
+                    <strong>My Wheelchair Requests</strong>
+                    <Badge bg="info">{requests.length}</Badge>
+                  </Card.Header>
+                  <Card.Body>
+                    {requests.length === 0 ? (
+                      <p className="text-muted mb-0">No wheelchair requests yet.</p>
+                    ) : (
+                      requests.map((r) => (
+                        <Card key={r.ID_DEMANDE} className="mb-2 shadow-sm">
+                          <Card.Body className="p-3 d-flex justify-content-between align-items-center">
+                            <div>
+                              <strong>{r.NOM_TYPE}</strong>
+                              <div className="small text-muted">{formatDate(r.DATE_DEMANDE)}</div>
+                              {r.NOTES_CLINICIEN && <div className="small text-warning mt-1">Note: {r.NOTES_CLINICIEN}</div>}
+                            </div>
+                            <Badge 
+                              bg={r.STATUT === 'APPROUVE' ? 'success' : r.STATUT === 'REJETE' ? 'danger' : 'warning'}
+                            >
+                              {r.STATUT}
+                            </Badge>
+                          </Card.Body>
+                        </Card>
+                      ))
+                    )}
+                    <div className="text-center mt-3">
+                      <Button variant="outline-primary" as={Link} to="/wheelchairs" size="sm">
+                        Browse wheelchairs
                       </Button>
                     </div>
                   </Card.Body>

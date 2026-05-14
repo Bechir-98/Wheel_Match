@@ -183,10 +183,10 @@ body {
 /* Ensure the form is centered on the page */
 .form {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
+  min-height: 100vh;
   background-color: #f4f4f4;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 .av {
@@ -201,12 +201,14 @@ body {
 }
 
 .formm {
+  margin: auto;
   background-color: #fff;
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+  box-sizing: border-box;
 }
 
 .formm h2 {
@@ -328,19 +330,21 @@ footer a:hover {
 /* Form Styling */
 .form {
   display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
   background-color: #f4f4f4;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 .formm {
+  margin: auto;
   background-color: #fff;
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+  box-sizing: border-box;
 }
 
 .formm h2 {
@@ -483,19 +487,21 @@ button:hover {
 /* Sign Page Styles */
 .sign-form {
   display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
   background-color: #f4f4f4;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 .sign-form .formm {
+  margin: auto;
   background-color: #fff;
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+  box-sizing: border-box;
 }
 
 .sign-form h2 {
@@ -555,19 +561,21 @@ button:hover {
 /* Login Page Styles */
 .log-form {
   display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
   background-color: #f4f4f4;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 .log-form .formm {
+  margin: auto;
   background-color: #fff;
   padding: 30px;
   border-radius: 8px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 400px;
+  box-sizing: border-box;
 }
 
 .log-form h2 {
@@ -627,15 +635,15 @@ button:hover {
 /* Shared Wrapper Styles */
 .form-wrapper {
   display: flex;
-  justify-content: center;
-  align-items: center;
   min-height: 100vh;
   background-color: #f0f2f5;
-  padding: 1rem;
+  padding: 40px 20px;
+  box-sizing: border-box;
 }
 
 /* Common Form Styles */
 .formm {
+  margin: auto;
   background-color: #ffffff;
   padding: 32px;
   border-radius: 12px;
@@ -698,4 +706,65 @@ button:hover {
   background-color: #212529;
 }
 
+/* Wheelchairs UI Styles */
+.transition-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
 
+.transition-hover:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
+}
+
+.hover-zoom {
+  transition: transform 0.5s ease;
+  overflow: hidden;
+}
+
+.hover-zoom:hover img {
+  transform: scale(1.05);
+}
+
+.product-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1) !important;
+}
+
+.product-img {
+  transition: opacity 0.3s ease;
+}
+
+.product-card:hover .product-img {
+  opacity: 0.85;
+}
+
+.thumbnail-container {
+  transition: all 0.2s ease;
+}
+
+.thumbnail-container:hover, .thumbnail-container.active {
+  border-color: var(--bs-primary) !important;
+  transform: scale(1.05);
+}
+
+.thumbnail-preview {
+  width: 60px;
+  height: 60px;
+  cursor: pointer;
+  border-radius: 8px;
+  padding: 2px;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.thumbnail-preview:hover, .thumbnail-preview.active {
+  border-color: var(--bs-primary) !important;
+}
+
+.transition-all {
+  transition: all 0.3s ease;
+}

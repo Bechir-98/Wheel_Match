@@ -7,7 +7,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_clinician
-from app.models import Consultation, Patient, PatientMedical, Pathologie, Utilisateur
+from app.models import Consultation, Patient, PatientMedical, Pathologie, Utilisateur, DemandeFauteuil, Fauteuil, TypeFauteuil
+from app.schemas.demandes import DemandeStatusUpdate
+from fastapi import HTTPException, status
 
 router = APIRouter()
 
@@ -112,3 +114,51 @@ def clinician_dashboard(
         "consultations_recent": recent_list,
         "patients_needing_medical_file": patients_needing_file,
     }
+
+@router.get("/requests")
+def get_clinician_requests(
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_clinician),
+):
+    rows = (
+        db.query(DemandeFauteuil, Fauteuil, TypeFauteuil.NOM_TYPE, Patient)
+        .join(Fauteuil, DemandeFauteuil.ID_FAUTEUIL == Fauteuil.ID_FAUTEUIL)
+        .join(TypeFauteuil, Fauteuil.ID_TYPE == TypeFauteuil.ID_TYPE)
+        .join(Patient, DemandeFauteuil.ID_PATIENT == Patient.ID_UTILISATUER)
+        .order_by(DemandeFauteuil.DATE_DEMANDE.desc())
+        .all()
+    )
+    
+    out = []
+    for d, f, nom_type, p in rows:
+        out.append({
+            "ID_DEMANDE": d.ID_DEMANDE,
+            "ID_FAUTEUIL": d.ID_FAUTEUIL,
+            "NOM_TYPE": nom_type,
+            "STATUT": d.STATUT,
+            "NOTES_CLINICIEN": d.NOTES_CLINICIEN,
+            "DATE_DEMANDE": d.DATE_DEMANDE.isoformat() if d.DATE_DEMANDE else None,
+            "DATE_MAJ": d.DATE_MAJ.isoformat() if d.DATE_MAJ else None,
+            "patient_name": _patient_name(p),
+            "ID_PATIENT": p.ID_UTILISATUER
+        })
+    return out
+
+@router.put("/requests/{demande_id}/status")
+def update_request_status(
+    demande_id: int,
+    update_data: DemandeStatusUpdate,
+    db: Session = Depends(get_db),
+    user: Utilisateur = Depends(require_clinician),
+):
+    d = db.query(DemandeFauteuil).filter(DemandeFauteuil.ID_DEMANDE == demande_id).first()
+    if not d:
+        raise HTTPException(status_code=404, detail="Demande not found")
+        
+    d.STATUT = update_data.statut
+    if update_data.notes_clinicien is not None:
+        d.NOTES_CLINICIEN = update_data.notes_clinicien
+        
+    db.commit()
+    db.refresh(d)
+    return {"status": "success", "demande_id": d.ID_DEMANDE, "nouveau_statut": d.STATUT}

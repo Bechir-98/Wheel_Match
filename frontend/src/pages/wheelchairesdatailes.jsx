@@ -11,7 +11,8 @@ import sportWheelchair from '../assets/wheelchair-sport.jpg';
 import defaultWheelchair from '../assets/brand.png';
 import componentImage1 from '../assets/component1.jpg';
 import componentImage2 from '../assets/component2.jpg';
-import { apiUrl } from '../config/api.js';
+import { apiUrl, authHeaders } from '../config/api.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const WheelchairDetail = () => {
   const { id } = useParams();
@@ -22,6 +23,30 @@ const WheelchairDetail = () => {
   const [relatedWheelchairs, setRelatedWheelchairs] = useState([]);
   const [activeImage, setActiveImage] = useState(0);
   const [showEnlargeModal, setShowEnlargeModal] = useState(false);
+  const { user } = useAuth();
+  const [requestStatus, setRequestStatus] = useState(null);
+
+  const handleRequest = async () => {
+    try {
+      setRequestStatus('loading');
+      const res = await fetch(apiUrl('/patient/requests'), {
+        method: 'POST',
+        headers: {
+          ...authHeaders(),
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ id_fauteuil: wheelchair.ID_FAUTEUIL })
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.detail || 'Erreur lors de la demande');
+      }
+      setRequestStatus('success');
+    } catch (err) {
+      setRequestStatus('error');
+      alert(err.message);
+    }
+  };
 
   const getWheelchairImage = (typeName) => {
     const imageMap = {
@@ -232,9 +257,22 @@ const WheelchairDetail = () => {
               </Tabs>
 
               <div className="mt-auto d-grid gap-2">
-                <Button variant="primary" size="lg" disabled={wheelchair.QT_STOCK <= 0}>
-                  {wheelchair.QT_STOCK > 0 ? 'Ajouter au panier' : 'Notifier en cas de disponibilité'}
-                </Button>
+                {user?.userType === 'patient' ? (
+                  <Button 
+                    variant="primary" 
+                    size="lg" 
+                    disabled={wheelchair.QT_STOCK <= 0 || requestStatus === 'loading' || requestStatus === 'success'}
+                    onClick={handleRequest}
+                  >
+                    {requestStatus === 'success' ? 'Demande envoyée !' : 
+                     requestStatus === 'loading' ? 'Envoi...' : 
+                     'Demander l\'approbation du clinicien'}
+                  </Button>
+                ) : (
+                  <Button variant="primary" size="lg" disabled={wheelchair.QT_STOCK <= 0}>
+                    {wheelchair.QT_STOCK > 0 ? 'Ajouter au panier' : 'Notifier en cas de disponibilité'}
+                  </Button>
+                )}
                 <Button variant="outline-secondary">Contacter un spécialiste</Button>
               </div>
             </Card.Body>

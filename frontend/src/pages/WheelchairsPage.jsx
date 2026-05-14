@@ -741,27 +741,6 @@ const WheelchairsPage = () => {
   );
 };
 
-// Add this to your CSS file
-`
-.transition-hover {
-  transition: transform 0.3s ease, box-shadow 0.3s ease;
-}
-
-.transition-hover:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 20px rgba(0,0,0,0.1) !important;
-}
-
-.hover-zoom {
-  transition: transform 0.5s ease;
-  overflow: hidden;
-}
-
-.hover-zoom:hover img {
-  transform: scale(1.05);
-}
-`
-
 WheelchairsPage.propTypes = {
   // Add prop types if needed
 };
